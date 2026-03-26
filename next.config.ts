@@ -1,9 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  experimental: {
-    instrumentationHook: true,
-  },
+  output: "standalone",
   images: {
     remotePatterns: [
       {
