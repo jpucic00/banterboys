@@ -25,6 +25,11 @@ const LEAGUE_LABELS: Record<string, string> = {
   soccer_belgium_first_div:             "Belgian Pro League",
   soccer_spl:                           "Scottish Premiership",
   soccer_usa_mls:                       "MLS",
+  soccer_uefa_nations_league:                  "Nations League",
+  soccer_fifa_world_cup:                       "FIFA World Cup",
+  soccer_europe_euro_qualification:            "Euro Qualification",
+  soccer_fifa_world_cup_qualification_europe:  "WC Qualification",
+  soccer_international_friendly:               "International Friendlies",
   basketball_nba:                       "NBA",
   basketball_ncaab:                     "NCAA Basketball",
   basketball_euroleague:                "EuroLeague",
@@ -56,8 +61,8 @@ interface BetCardProps {
     currency: string;
     status: string;
     createdAt: string;
-    creator: { id: string; name: string | null; image: string | null };
-    acceptor?: { id: string; name: string | null; image: string | null } | null;
+    creator: { id: string; name: string | null; alias: string | null; image: string | null };
+    acceptor?: { id: string; name: string | null; alias: string | null; image: string | null } | null;
     event: {
       homeTeam: string;
       awayTeam: string;
@@ -122,9 +127,9 @@ export default function BetCard({ bet, onJoin, onCancel }: BetCardProps) {
 
   const statusLabel =
     bet.status === "WON_CREATOR"
-      ? `${bet.creator.name ?? "Creator"} won`
+      ? `${bet.creator.alias ?? bet.creator.name ?? "Creator"} won`
       : bet.status === "WON_ACCEPTOR"
-        ? `${bet.acceptor?.name ?? "Acceptor"} won`
+        ? `${bet.acceptor?.alias ?? bet.acceptor?.name ?? "Acceptor"} won`
         : bet.status;
 
   const statusColor =
@@ -163,7 +168,9 @@ export default function BetCard({ bet, onJoin, onCancel }: BetCardProps) {
         style={{ background: "#1a1a1a" }}
       >
         <div className="flex items-center gap-2 text-xs text-text-muted">
-          <span className="bg-gold/20 text-gold px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">
+          <span className="flex items-center gap-1 bg-gold/20 text-gold px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/tibia/black_skull.webp" alt="" width={14} height={14} style={{ imageRendering: "pixelated" }} />
             PvP
           </span>
           <span className="uppercase tracking-wide text-[11px]">
@@ -187,7 +194,7 @@ export default function BetCard({ bet, onJoin, onCancel }: BetCardProps) {
               // eslint-disable-next-line @next/next/no-img-element
               <img src="/tibia/amulet_of_loss.webp" alt="" width={20} height={20} style={{ imageRendering: "pixelated" }} />
             )}
-            <span className="text-sm font-bold text-white truncate">{bet.creator.name ?? "Unknown"}</span>
+            <span className="text-sm font-bold text-white truncate">{bet.creator.alias ?? bet.creator.name ?? "Unknown"}</span>
           </div>
           <div className="text-xs text-gold mt-0.5 pl-0.5">{pickLabel} →</div>
         </div>
@@ -221,7 +228,7 @@ export default function BetCard({ bet, onJoin, onCancel }: BetCardProps) {
                   // eslint-disable-next-line @next/next/no-img-element
                   <img src="/tibia/amulet_of_loss.webp" alt="" width={20} height={20} style={{ imageRendering: "pixelated" }} />
                 )}
-                <span className="text-sm font-bold text-white truncate">{bet.acceptor.name ?? "Unknown"}</span>
+                <span className="text-sm font-bold text-white truncate">{bet.acceptor.alias ?? bet.acceptor.name ?? "Unknown"}</span>
                 {bet.acceptor.image && (
                   <Image src={bet.acceptor.image} alt="" width={20} height={20} className="rounded-full shrink-0" />
                 )}

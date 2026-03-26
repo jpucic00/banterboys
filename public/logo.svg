@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 500" width="600" height="500">
+  <defs>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Lobster&amp;display=swap');
+    </style>
+    <filter id="shadow" x="-10%" y="-10%" width="125%" height="125%">
+      <feDropShadow dx="4" dy="5" stdDeviation="3" flood-color="#1a0a00" flood-opacity="0.5"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="600" height="500" fill="#B22222" rx="12"/>
+
+  <!-- BANTER text -->
+  <g transform="translate(295, 220) rotate(-5)" filter="url(#shadow)">
+    <!-- Dark outline layer -->
+    <text
+      text-anchor="middle"
+      font-family="'Lobster', cursive"
+      font-weight="400"
+      font-size="150"
+      letter-spacing="2"
+      fill="#1B3B2F"
+      stroke="#1B3B2F"
+      stroke-width="18"
+      stroke-linejoin="round"
+    >Banter</text>
+    <!-- Gold fill layer -->
+    <text
+      text-anchor="middle"
+      font-family="'Lobster', cursive"
+      font-weight="400"
+      font-size="150"
+      letter-spacing="2"
+      fill="#F0A818"
+    >Banter</text>
+  </g>
+
+  <!-- BOYS text -->
+  <g transform="translate(295, 390) rotate(-5)" filter="url(#shadow)">
+    <!-- Dark outline layer -->
+    <text
+      text-anchor="middle"
+      font-family="'Lobster', cursive"
+      font-weight="400"
+      font-size="170"
+      letter-spacing="4"
+      fill="#1B3B2F"
+      stroke="#1B3B2F"
+      stroke-width="18"
+      stroke-linejoin="round"
+    >Boys</text>
+    <!-- Gold fill layer -->
+    <text
+      text-anchor="middle"
+      font-family="'Lobster', cursive"
+      font-weight="400"
+      font-size="170"
+      letter-spacing="4"
+      fill="#F0A818"
+    >Boys</text>
+  </g>
+
+  <!-- Bold swoosh underline -->
+  <g transform="rotate(-5, 300, 420)" filter="url(#shadow)">
+    <path
+      d="M 105 425 Q 220 455 340 435 Q 430 420 475 400 Q 500 390 495 380 Q 488 372 465 380 Q 450 386 445 392"
+      fill="none"
+      stroke="#1B3B2F"
+      stroke-width="20"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <path
+      d="M 105 425 Q 220 455 340 435 Q 430 420 475 400 Q 500 390 495 380 Q 488 372 465 380 Q 450 386 445 392"
+      fill="none"
+      stroke="#F0A818"
+      stroke-width="10"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </g>
+</svg>

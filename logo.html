@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Banter Boys</title>
+<link href="https://fonts.googleapis.com/css2?family=Lobster&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: #111;
+  }
+
+  .logo-container {
+    width: 600px;
+    height: 500px;
+    background: radial-gradient(ellipse at center, #C62828 0%, #8B1A1A 80%, #5A0E0E 100%);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    border-radius: 12px;
+    transform: rotate(0deg);
+    overflow: hidden;
+    position: relative;
+  }
+
+  .text-wrapper {
+    transform: rotate(-5deg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: -20px;
+  }
+
+  .logo-text {
+    font-family: 'Lobster', cursive;
+    color: #F0A818;
+    position: relative;
+    line-height: 0.85;
+    -webkit-text-stroke: 0;
+  }
+
+  .logo-text span {
+    position: relative;
+    display: block;
+    paint-order: stroke fill;
+    -webkit-text-stroke: 12px #1B3B2F;
+    text-shadow:
+      4px 5px 4px rgba(10, 5, 0, 0.5);
+  }
+
+  .logo-text span::after {
+    content: attr(data-text);
+    position: absolute;
+    left: 0;
+    top: 0;
+    -webkit-text-stroke: 0;
+    background: linear-gradient(180deg, #FFD044 0%, #F0A818 40%, #CC8510 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .banter {
+    font-size: 130px;
+    letter-spacing: 2px;
+  }
+
+  .boys {
+    font-size: 150px;
+    letter-spacing: 4px;
+    margin-top: 5px;
+  }
+
+</style>
+</head>
+<body>
+  <div class="logo-container">
+    <div class="text-wrapper">
+      <div class="logo-text banter">
+        <span data-text="Banter">Banter</span>
+      </div>
+      <div class="logo-text boys">
+        <span data-text="Boys">Boys</span>
+      </div>
+
+    </div>
+  </div>
+</body>
+</html>

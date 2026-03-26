@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
@@ -35,8 +35,34 @@ export default function JoinBetButton({
   const [showConfirm, setShowConfirm] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const canJoin = session?.user && session.user.id !== creatorId;
-  if (!canJoin) return null;
+  // Hide button only for the creator of the bet
+  if (session?.user?.id === creatorId) return null;
+
+  // Not signed in — show button that redirects to sign in
+  if (!session?.user) {
+    return (
+      <button
+        onClick={() => signIn("discord")}
+        style={{
+          background: "#00c853",
+          border: "none",
+          borderRadius: 6,
+          padding: "6px 16px",
+          fontSize: 12,
+          fontWeight: 700,
+          color: "#fff",
+          cursor: "pointer",
+          letterSpacing: "0.04em",
+          textTransform: "uppercase",
+          transition: "background 0.15s",
+        }}
+        onMouseEnter={e => (e.currentTarget.style.background = "#00a846")}
+        onMouseLeave={e => (e.currentTarget.style.background = "#00c853")}
+      >
+        Join Bet
+      </button>
+    );
+  }
 
   async function handleConfirm() {
     setLoading(true);

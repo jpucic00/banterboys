@@ -7,11 +7,11 @@ import JoinBetButton from "@/components/JoinBetButton";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const [p2pBets, tickets] = await Promise.all([
-    prisma.p2PBet.findMany({
+  const [pvpBets, tickets] = await Promise.all([
+    prisma.pvPBet.findMany({
       include: {
-        creator: { select: { id: true, name: true, image: true } },
-        acceptor: { select: { id: true, name: true, image: true } },
+        creator: { select: { id: true, name: true, alias: true, image: true } },
+        acceptor: { select: { id: true, name: true, alias: true, image: true } },
         event: { include: { sport: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -19,7 +19,7 @@ export default async function Home() {
     }),
     prisma.ticket.findMany({
       include: {
-        user: { select: { name: true, image: true } },
+        user: { select: { name: true, alias: true, image: true } },
         selections: { include: { event: { include: { sport: true } } } },
       },
       orderBy: { createdAt: "desc" },
@@ -29,11 +29,11 @@ export default async function Home() {
 
   // Merge and sort by settledAt descending
   type HistoryItem =
-    | { type: "p2p"; date: Date; data: P2PBetWithRelations }
+    | { type: "pvp"; date: Date; data: PvPBetWithRelations }
     | { type: "ticket"; date: Date; data: TicketWithRelations };
 
   const feed: HistoryItem[] = [
-    ...p2pBets.map((b) => ({ type: "p2p" as const, date: b.createdAt, data: b })),
+    ...pvpBets.map((b) => ({ type: "pvp" as const, date: b.createdAt, data: b })),
     ...tickets.map((t) => ({ type: "ticket" as const, date: t.createdAt, data: t })),
   ].sort((a, b) => b.date.getTime() - a.date.getTime());
 
@@ -58,7 +58,7 @@ export default async function Home() {
           <div className="relative z-10 pr-16">
             <div className="flex items-center gap-2 mb-2">
               <span className="w-1.5 h-1.5 rounded-full bg-gold" />
-              <h2 className="text-base font-bold text-white uppercase tracking-wide">P2P Bets</h2>
+              <h2 className="text-base font-bold text-white uppercase tracking-wide">PvP Bets</h2>
             </div>
             <p className="text-text-muted text-sm leading-relaxed">
               Challenge other guild members. Set your own odds and amount. Someone picks it up, you&apos;re on.
@@ -88,7 +88,7 @@ export default async function Home() {
           <div className="relative z-10 pr-16">
             <div className="flex items-center gap-2 mb-2">
               <span className="w-1.5 h-1.5 rounded-full bg-odds-green" />
-              <h2 className="text-base font-bold text-white uppercase tracking-wide">Ticket Bets</h2>
+              <h2 className="text-base font-bold text-white uppercase tracking-wide">Bet Slips</h2>
             </div>
             <p className="text-text-muted text-sm leading-relaxed">
               Build a bet slip with one or more picks against house odds. Higher combo, bigger payout.
@@ -114,8 +114,8 @@ export default async function Home() {
 
         <div className="space-y-2">
           {feed.map((item) =>
-            item.type === "p2p" ? (
-              <P2PCard key={`p2p-${item.data.id}`} bet={item.data} />
+            item.type === "pvp" ? (
+              <PvPCard key={`pvp-${item.data.id}`} bet={item.data} />
             ) : (
               <TicketCard key={`ticket-${item.data.id}`} ticket={item.data} />
             )
@@ -147,6 +147,10 @@ const LEAGUE_LABELS: Record<string, string> = {
   soccer_belgium_first_div:             "Belgian Pro League",
   soccer_spl:                           "Scottish Premiership",
   soccer_usa_mls:                       "MLS",
+  soccer_uefa_nations_league:                  "Nations League",
+  soccer_fifa_world_cup:                       "FIFA World Cup",
+  soccer_europe_euro_qualification:            "Euro Qualification",
+  soccer_fifa_world_cup_qualification_europe:  "WC Qualification",
   basketball_nba:                       "NBA",
   basketball_ncaab:                     "NCAA Basketball",
   basketball_euroleague:                "EuroLeague",
@@ -172,14 +176,14 @@ function leagueLabel(sport: { name: string; key: string }) {
   return LEAGUE_LABELS[sport.key] ?? sport.name;
 }
 
-function p2pBorderColor(status: string) {
+function pvpBorderColor(status: string) {
   if (status === "WON_CREATOR" || status === "WON_ACCEPTOR") return "#00c853";
   if (status === "CANCELLED" || status === "VOID") return "#252525";
   if (status === "LOST") return "#ef4444";
   return "#F0A818"; // OPEN, MATCHED, PENDING
 }
 
-function p2pStatusColor(status: string) {
+function pvpStatusColor(status: string) {
   if (status === "WON_CREATOR" || status === "WON_ACCEPTOR") return "#00c853";
   if (status === "CANCELLED" || status === "VOID") return "#555";
   if (status === "LOST") return "#ef4444";
@@ -199,13 +203,13 @@ function ticketStatusColor(status: string) {
   return "#F0A818";
 }
 
-function PlayerAvatar({ name, image }: { name: string | null; image: string | null }) {
+function PlayerAvatar({ name, alias, image }: { name: string | null; alias: string | null; image: string | null }) {
   return (
     <span className="inline-flex items-center gap-1">
       {image ? (
         <Image src={image} alt="" width={14} height={14} className="rounded-full inline-block" />
       ) : null}
-      <span>{name ?? "Unknown"}</span>
+      <span>{alias ?? name ?? "Unknown"}</span>
     </span>
   );
 }
@@ -218,9 +222,9 @@ function TimeAgo({ date }: { date: Date }) {
   return <span>{Math.floor(diff / 86400)}d ago</span>;
 }
 
-// ─── P2P card ─────────────────────────────────────────────────────────────────
+// ─── PvP card ─────────────────────────────────────────────────────────────────
 
-type P2PBetWithRelations = {
+type PvPBetWithRelations = {
   id: string;
   status: string;
   pick: string;
@@ -229,8 +233,8 @@ type P2PBetWithRelations = {
   currency: string;
   createdAt: Date;
   settledAt: Date | null;
-  creator: { id: string; name: string | null; image: string | null };
-  acceptor: { id: string; name: string | null; image: string | null } | null;
+  creator: { id: string; name: string | null; alias: string | null; image: string | null };
+  acceptor: { id: string; name: string | null; alias: string | null; image: string | null } | null;
   event: {
     homeTeam: string;
     awayTeam: string;
@@ -239,7 +243,7 @@ type P2PBetWithRelations = {
   };
 };
 
-function P2PCard({ bet }: { bet: P2PBetWithRelations }) {
+function PvPCard({ bet }: { bet: PvPBetWithRelations }) {
   const pick =
     bet.pick === "HOME" ? bet.event.homeTeam
     : bet.pick === "AWAY" ? bet.event.awayTeam
@@ -251,19 +255,23 @@ function P2PCard({ bet }: { bet: P2PBetWithRelations }) {
     : "Either team wins";
 
   const statusLabel =
-    bet.status === "WON_CREATOR" ? `${bet.creator.name ?? "Creator"} won`
-    : bet.status === "WON_ACCEPTOR" ? `${bet.acceptor?.name ?? "Acceptor"} won`
+    bet.status === "WON_CREATOR" ? `${bet.creator.alias ?? bet.creator.name ?? "Creator"} won`
+    : bet.status === "WON_ACCEPTOR" ? `${bet.acceptor?.alias ?? bet.acceptor?.name ?? "Acceptor"} won`
     : bet.status;
 
   return (
     <div
       className="rounded-md border border-border overflow-hidden"
-      style={{ background: "#141414", borderLeft: `2px solid ${p2pBorderColor(bet.status)}` }}
+      style={{ background: "#141414", borderLeft: `2px solid ${pvpBorderColor(bet.status)}` }}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border" style={{ background: "#1a1a1a" }}>
         <div className="flex items-center gap-2 text-xs text-text-muted">
-          <span className="bg-gold/20 text-gold px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">PvP</span>
+          <span className="flex items-center gap-1 bg-gold/20 text-gold px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/tibia/black_skull.webp" alt="" width={14} height={14} style={{ imageRendering: "pixelated" }} />
+            PvP
+          </span>
           <span className="uppercase tracking-wide text-[11px]">{leagueLabel(bet.event.sport)}</span>
         </div>
         <span className="text-xs text-text-muted"><TimeAgo date={bet.createdAt} /></span>
@@ -277,7 +285,7 @@ function P2PCard({ bet }: { bet: P2PBetWithRelations }) {
             {bet.creator.image && (
               <Image src={bet.creator.image} alt="" width={20} height={20} className="rounded-full shrink-0" />
             )}
-            <span className="text-sm font-bold text-white truncate">{bet.creator.name ?? "Unknown"}</span>
+            <span className="text-sm font-bold text-white truncate">{bet.creator.alias ?? bet.creator.name ?? "Unknown"}</span>
           </div>
           <div className="text-xs text-gold mt-0.5 pl-0.5">{pick} →</div>
         </div>
@@ -306,7 +314,7 @@ function P2PCard({ bet }: { bet: P2PBetWithRelations }) {
           ) : bet.acceptor ? (
             <div className="flex flex-col items-end">
               <div className="flex items-center gap-1.5">
-                <span className="text-sm font-bold text-white truncate">{bet.acceptor.name ?? "Unknown"}</span>
+                <span className="text-sm font-bold text-white truncate">{bet.acceptor.alias ?? bet.acceptor.name ?? "Unknown"}</span>
                 {bet.acceptor.image && (
                   <Image src={bet.acceptor.image} alt="" width={20} height={20} className="rounded-full shrink-0" />
                 )}
@@ -334,7 +342,7 @@ function P2PCard({ bet }: { bet: P2PBetWithRelations }) {
           <span className="text-text-muted">vs</span>
           <CoinAmount amount={Math.round(bet.amount * bet.odds)} currency={bet.currency} size={13} />
         </div>
-        <span className="ml-auto font-medium uppercase tracking-wide text-[10px]" style={{ color: p2pStatusColor(bet.status) }}>
+        <span className="ml-auto font-medium uppercase tracking-wide text-[10px]" style={{ color: pvpStatusColor(bet.status) }}>
           {statusLabel}
         </span>
       </div>
@@ -353,7 +361,7 @@ type TicketWithRelations = {
   currency: string;
   createdAt: Date;
   settledAt: Date | null;
-  user: { name: string | null; image: string | null };
+  user: { name: string | null; alias: string | null; image: string | null };
   selections: {
     id: string;
     pick: string;
@@ -377,10 +385,12 @@ function TicketCard({ ticket }: { ticket: TicketWithRelations }) {
       {/* Header */}
       <div className="flex items-center justify-between px-3 py-2 border-b border-border" style={{ background: "#1a1a1a" }}>
         <div className="flex items-center gap-2 text-xs text-text-muted">
-          <span className="bg-gold/20 text-gold px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">
-            Ticket
+          <span className="flex items-center gap-1 bg-gold/20 text-gold px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/tibia/green_skull.webp" alt="" width={14} height={14} style={{ imageRendering: "pixelated" }} />
+            Bet Slip
           </span>
-          <PlayerAvatar name={ticket.user.name} image={ticket.user.image} />
+          <PlayerAvatar name={ticket.user.name} alias={ticket.user.alias} image={ticket.user.image} />
         </div>
         <div className="flex items-center gap-1.5">
           {ticket.status === "LOST" && (

@@ -1,0 +1,206 @@
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/client"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum EventStatus {
+  UPCOMING
+  LIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum Pick {
+  HOME
+  AWAY
+  DRAW
+}
+
+enum Currency {
+  GOLD
+  TIBIA_COINS
+}
+
+enum PvPBetStatus {
+  OPEN
+  MATCHED
+  WON_CREATOR
+  WON_ACCEPTOR
+  CANCELLED
+  VOID
+}
+
+enum TicketStatus {
+  PENDING
+  WON
+  LOST
+  VOID
+}
+
+enum SelectionResult {
+  PENDING
+  WON
+  LOST
+  VOID
+}
+
+// NextAuth required models
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  alias         String?   @unique
+  email         String?   @unique
+  emailVerified DateTime?
+  image         String?
+  role          UserRole  @default(USER)
+  createdAt     DateTime  @default(now())
+
+  accounts       Account[]
+  sessions       Session[]
+  createdBets    PvPBet[]  @relation("BetCreator")
+  acceptedBets   PvPBet[]  @relation("BetAcceptor")
+  tickets        Ticket[]
+}
+
+model Sport {
+  id     String  @id @default(cuid())
+  key    String  @unique // e.g. "basketball_nba"
+  name   String           // e.g. "NBA"
+  active Boolean @default(true)
+  events Event[]
+}
+
+model Event {
+  id           String      @id @default(cuid())
+  apiEventId   String      @unique
+  sportId      String
+  homeTeam     String
+  awayTeam     String
+  commenceTime DateTime
+  homeScore    Int?
+  awayScore    Int?
+  status       EventStatus @default(UPCOMING)
+  completedAt  DateTime?
+  espnEventId  String?     @unique
+  updatedAt    DateTime    @updatedAt
+
+  sport      Sport           @relation(fields: [sportId], references: [id])
+  odds       OddsSnapshot[]
+  pvpBets    PvPBet[]
+  selections TicketSelection[]
+
+  @@index([status])
+  @@index([commenceTime])
+}
+
+model OddsSnapshot {
+  id        String   @id @default(cuid())
+  eventId   String
+  homeOdds  Float
+  awayOdds  Float
+  drawOdds  Float?
+  bookmaker String
+  fetchedAt DateTime @default(now())
+
+  event Event @relation(fields: [eventId], references: [id])
+
+  @@index([eventId, fetchedAt])
+}
+
+model PvPBet {
+  id         String       @id @default(cuid())
+  creatorId  String
+  acceptorId String?
+  eventId    String
+  pick       Pick
+  amount     Float
+  odds       Float
+  currency   Currency     @default(GOLD)
+  status     PvPBetStatus @default(OPEN)
+  createdAt  DateTime     @default(now())
+  settledAt  DateTime?
+
+  creator  User  @relation("BetCreator", fields: [creatorId], references: [id])
+  acceptor User? @relation("BetAcceptor", fields: [acceptorId], references: [id])
+  event    Event @relation(fields: [eventId], references: [id])
+
+  @@index([status])
+  @@index([eventId])
+}
+
+model Ticket {
+  id              String       @id @default(cuid())
+  userId          String
+  totalOdds       Float
+  amount          Float
+  currency        Currency     @default(GOLD)
+  potentialPayout Float
+  status          TicketStatus @default(PENDING)
+  createdAt       DateTime     @default(now())
+  settledAt       DateTime?
+
+  user       User              @relation(fields: [userId], references: [id])
+  selections TicketSelection[]
+
+  @@index([status])
+  @@index([userId])
+}
+
+model TicketSelection {
+  id       String          @id @default(cuid())
+  ticketId String
+  eventId  String
+  pick     Pick
+  odds     Float
+  result   SelectionResult @default(PENDING)
+
+  ticket Ticket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  event  Event  @relation(fields: [eventId], references: [id])
+
+  @@index([ticketId])
+  @@index([eventId])
+}

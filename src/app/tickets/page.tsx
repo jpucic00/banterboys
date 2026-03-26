@@ -2,6 +2,7 @@
 
 import { useSession } from "next-auth/react";
 import { useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import { CoinAmount } from "@/components/CoinIcon";
 
 interface Event {
@@ -31,6 +32,14 @@ const SPORT_CATEGORIES: Record<string, SportCategory> = {
   soccer_germany_bundesliga: "football",
   soccer_italy_serie_a: "football",
   soccer_uefa_champs_league: "football",
+  soccer_uefa_europa_league: "football",
+  soccer_uefa_europa_conference_league: "football",
+  soccer_uefa_nations_league: "football",
+  soccer_fifa_world_cup: "football",
+  soccer_europe_euro_qualification: "football",
+  soccer_fifa_world_cup_qualification_europe: "football",
+  soccer_international_friendly: "football",
+  soccer_netherlands_eredivisie: "football",
   tennis_atp_french_open: "tennis",
   tennis_atp_wimbledon: "tennis",
   tennis_atp_us_open: "tennis",
@@ -44,6 +53,14 @@ const LEAGUE_NAMES: Record<string, string> = {
   soccer_germany_bundesliga: "Bundesliga",
   soccer_italy_serie_a: "Serie A",
   soccer_uefa_champs_league: "Champions League",
+  soccer_uefa_europa_league: "Europa League",
+  soccer_uefa_europa_conference_league: "Conference League",
+  soccer_uefa_nations_league: "Nations League",
+  soccer_fifa_world_cup: "FIFA World Cup",
+  soccer_europe_euro_qualification: "Euro Qualification",
+  soccer_fifa_world_cup_qualification_europe: "WC Qualification",
+  soccer_international_friendly: "International Friendlies",
+  soccer_netherlands_eredivisie: "Eredivisie",
   tennis_atp_french_open: "French Open",
   tennis_atp_wimbledon: "Wimbledon",
   tennis_atp_us_open: "US Open",
@@ -159,8 +176,10 @@ function TicketCard({ ticket }: { ticket: any }) {
         style={{ background: "#1a1a1a" }}
       >
         <div className="flex items-center gap-2 text-xs text-text-muted">
-          <span className="bg-gold/20 text-gold px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">
-            Ticket
+          <span className="flex items-center gap-1 bg-gold/20 text-gold px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wide">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/tibia/green_skull.webp" alt="" width={14} height={14} style={{ imageRendering: "pixelated" }} />
+            Bet Slip
           </span>
           <span className="text-[11px] text-text-muted">
             {new Date(ticket.createdAt).toLocaleDateString()}
@@ -255,6 +274,9 @@ export default function TicketsPage() {
   const [currency, setCurrency] = useState("GOLD");
   const [submitting, setSubmitting] = useState(false);
   const [tab, setTab] = useState<"build" | "mine">("build");
+  const [mobileSlipOpen, setMobileSlipOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
   const [sportCategory, setSportCategory] = useState<SportCategory>("all");
 
   const canInteract = !!session;
@@ -337,6 +359,12 @@ export default function TicketsPage() {
     }
   }
 
+  // Auto-open mobile slip when first item is added
+  useEffect(() => {
+    if (slip.length > 0) setMobileSlipOpen(true);
+    if (slip.length === 0) setMobileSlipOpen(false);
+  }, [slip.length]);
+
   // Filter events by selected sport category
   const filteredEvents =
     sportCategory === "all"
@@ -359,7 +387,6 @@ export default function TicketsPage() {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-white uppercase tracking-wide">Ticket Bets</h1>
         <div className="flex gap-1">
           <button
             onClick={() => setTab("build")}
@@ -369,7 +396,7 @@ export default function TicketsPage() {
                 : "text-text-muted hover:text-white"
             }`}
           >
-            Build Ticket
+            Build Slip
           </button>
           {canInteract && (
             <button
@@ -380,7 +407,7 @@ export default function TicketsPage() {
                   : "text-text-muted hover:text-white"
               }`}
             >
-              My Tickets
+              My Slips
             </button>
           )}
         </div>
@@ -389,7 +416,7 @@ export default function TicketsPage() {
       {tab === "build" && (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Events list */}
-          <div className="lg:col-span-2 space-y-0">
+          <div className="lg:col-span-2 space-y-0 pb-20 lg:pb-0">
             {/* Sport category tabs */}
             <div className="flex gap-1 overflow-x-auto pb-1 mb-3 scrollbar-none">
               {SPORT_TABS.filter(
@@ -497,9 +524,9 @@ export default function TicketsPage() {
             ))}
           </div>
 
-          {/* Bet slip */}
+          {/* Bet slip — desktop only (mobile uses fixed bottom panel) */}
           <div
-            className="rounded-md border border-border h-fit sticky top-16 overflow-hidden"
+            className="hidden lg:block rounded-md border border-border h-fit sticky top-16 overflow-hidden"
             style={{ background: "#111111" }}
           >
             <div
@@ -586,7 +613,7 @@ export default function TicketsPage() {
                     disabled={submitting || !amount}
                     className="w-full bg-gold hover:bg-gold-bright text-black py-2 rounded text-sm font-bold uppercase tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {submitting ? "Placing..." : "Place Ticket"}
+                    {submitting ? "Placing..." : "Place Bet"}
                   </button>
                 </>
               )}
@@ -599,13 +626,141 @@ export default function TicketsPage() {
         <div className="space-y-3">
           {tickets.length === 0 && (
             <p className="text-text-muted text-center py-10 text-sm">
-              No tickets yet. Build one!
+              No slips yet. Build one!
             </p>
           )}
           {tickets.map((ticket) => (
             <TicketCard key={ticket.id} ticket={ticket} />
           ))}
         </div>
+      )}
+
+      {/* Mobile fixed bottom slip — portalled to body to escape any parent constraints */}
+      {mounted && tab === "build" && createPortal(
+        <div
+          className="lg:hidden flex flex-col"
+          style={{
+            position: "fixed",
+            bottom: 0,
+            left: 0,
+            right: 0,
+            width: "100%",
+            zIndex: 9999,
+            background: "#111111",
+            maxHeight: "70vh",
+            borderTop: "1px solid #252525",
+          }}
+        >
+          {/* Toggle bar — never scrolls */}
+          <button
+            onClick={() => setMobileSlipOpen((o) => !o)}
+            className="w-full shrink-0 flex items-center justify-between px-4 py-3"
+            style={{ background: "#1a1a1a" }}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-bold uppercase tracking-wider text-gold">Bet Slip</span>
+              {slip.length > 0 && (
+                <span className="text-xs bg-gold text-black rounded px-1.5 py-0.5 font-bold">{slip.length}</span>
+              )}
+            </div>
+            <div className="flex items-center gap-3">
+              {slip.length > 0 && (
+                <span className="text-xs text-odds-green font-mono">{totalOdds.toFixed(2)}x</span>
+              )}
+              <span className="text-text-muted text-xs">{mobileSlipOpen ? "▼" : "▲"}</span>
+            </div>
+          </button>
+
+          {mobileSlipOpen && (
+            <>
+              {/* Scrollable events — min-h-0 is required so flex doesn't let it grow unbounded */}
+              <div
+                className="border-b border-border"
+                style={{
+                  maxHeight: "200px",
+                  overflowY: "auto",
+                  overscrollBehavior: "contain",
+                  WebkitOverflowScrolling: "touch",
+                  touchAction: "pan-y",
+                }}
+              >
+                <div className="p-3 space-y-1">
+                  {slip.length === 0 ? (
+                    <p className="text-text-muted text-sm py-2 text-center">Select odds to add to slip.</p>
+                  ) : (
+                    slip.map((sel) => (
+                      <div
+                        key={sel.eventId}
+                        className="flex items-center justify-between text-sm border border-border rounded p-2"
+                        style={{ background: "#161616" }}
+                      >
+                        <div className="min-w-0">
+                          <div className="text-text-muted text-xs truncate">{sel.matchLabel}</div>
+                          <div className="text-gold font-medium text-xs">{sel.label}</div>
+                        </div>
+                        <div className="flex items-center gap-2 ml-2 shrink-0">
+                          <span className="text-odds-green font-mono text-sm">{sel.odds.toFixed(2)}</span>
+                          <button
+                            onClick={() => removeFromSlip(sel.eventId)}
+                            className="text-text-muted hover:text-loss text-xs w-4 h-4 flex items-center justify-center"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Controls — shrink-0 keeps this always fully visible below the scroll area */}
+              {slip.length > 0 && (
+                <div className="shrink-0 p-3 space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      value={amount}
+                      onChange={(e) => setAmount(e.target.value)}
+                      placeholder="Stake"
+                      min="1"
+                      className="flex-1 bg-surface border border-border rounded px-3 py-1.5 text-text-primary text-sm focus:outline-none focus:border-gold"
+                    />
+                    <select
+                      value={currency}
+                      onChange={(e) => setCurrency(e.target.value)}
+                      className="bg-surface border border-border rounded px-2 py-1.5 text-text-primary text-sm focus:outline-none"
+                    >
+                      <option value="GOLD">gp</option>
+                      <option value="TIBIA_COINS">TC</option>
+                    </select>
+                  </div>
+
+                  <div className="text-xs space-y-1 border border-border rounded p-2" style={{ background: "#161616" }}>
+                    <div className="flex justify-between text-text-muted">
+                      <span>Total Odds</span>
+                      <span className="text-odds-green font-mono">{totalOdds.toFixed(2)}</span>
+                    </div>
+                    <div className="flex justify-between font-medium">
+                      <span className="text-text-secondary">Potential Payout</span>
+                      <span className="text-gold">
+                        <CoinAmount amount={Math.round(potentialPayout)} currency={currency} />
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    onClick={handleSubmit}
+                    disabled={submitting || !amount}
+                    className="w-full bg-gold hover:bg-gold-bright text-black py-2 rounded text-sm font-bold uppercase tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {submitting ? "Placing..." : "Place Bet"}
+                  </button>
+                </div>
+              )}
+            </>
+          )}
+        </div>,
+        document.body
       )}
     </div>
   );

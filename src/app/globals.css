@@ -1,0 +1,51 @@
+@import url('https://fonts.googleapis.com/css2?family=Lobster&display=swap');
+@import "tailwindcss";
+
+@theme {
+  /* Sportsbook dark backgrounds */
+  --color-bg-primary: #0a0a0a;
+  --color-bg-secondary: #0f0f0f;
+  --color-bg-tertiary: #141414;
+  --color-surface: #161616;
+  --color-surface-hover: #1e1e1e;
+  --color-surface-light: #222222;
+  --color-surface-row: #141414;
+  --color-border: #252525;
+  --color-border-light: #2e2e2e;
+
+  /* Brand red */
+  --color-brand-red: #C62828;
+  --color-brand-red-dark: #8B1A1A;
+
+  /* Gold accent */
+  --color-gold: #F0A818;
+  --color-gold-dim: #CC8510;
+  --color-gold-bright: #FFD044;
+
+  /* Sharp green for odds/payout */
+  --color-odds-green: #00c853;
+  --color-odds-green-dim: #00a844;
+
+  /* Keep for backwards compat */
+  --color-tibia-green: #00c853;
+  --color-tibia-green-dim: #00a844;
+
+  /* Parchment */
+  --color-parchment: #c4a77d;
+  --color-parchment-dim: #9a7d5a;
+
+  /* Text */
+  --color-text-primary: #f0f0f0;
+  --color-text-secondary: #a0a0a0;
+  --color-text-muted: #606060;
+
+  /* Status */
+  --color-win: #22c55e;
+  --color-loss: #ef4444;
+  --color-info: #3b82f6;
+}
+
+body {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+}

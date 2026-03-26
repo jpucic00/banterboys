@@ -59,6 +59,11 @@ const LEAGUE_LABELS: Record<string, string> = {
   soccer_belgium_first_div:             "Belgian Pro League",
   soccer_spl:                           "Scottish Premiership",
   soccer_usa_mls:                       "MLS",
+  soccer_uefa_nations_league:                  "Nations League",
+  soccer_fifa_world_cup:                       "FIFA World Cup",
+  soccer_europe_euro_qualification:            "Euro Qualification",
+  soccer_fifa_world_cup_qualification_europe:  "WC Qualification",
+  soccer_international_friendly:               "International Friendlies",
   basketball_nba:                       "NBA",
   basketball_ncaab:                     "NCAA Basketball",
   basketball_euroleague:                "EuroLeague",
@@ -116,9 +121,24 @@ export default function BetsPage() {
 
   return (
     <div className="space-y-5">
-      {/* Header */}
+      {/* Filters + Create */}
       <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-white uppercase tracking-wide">PvP Bets</h1>
+        <div className="flex gap-2">
+          {(["all", "open", "mine"] as const).map((f) => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className="px-3 py-1 rounded text-xs font-medium transition-colors"
+              style={{
+                background: filter === f ? "#1f1f1f" : "transparent",
+                border: filter === f ? "1px solid #333" : "1px solid transparent",
+                color: filter === f ? "#fff" : "#666",
+              }}
+            >
+              {f === "all" ? "All" : f === "open" ? "Open" : "My Bets"}
+            </button>
+          ))}
+        </div>
         {session && (
           <button
             onClick={() => setShowCreate(true)}
@@ -128,24 +148,6 @@ export default function BetsPage() {
             + Create Bet
           </button>
         )}
-      </div>
-
-      {/* Filters */}
-      <div className="flex gap-2">
-        {(["all", "open", "mine"] as const).map((f) => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className="px-3 py-1 rounded text-xs font-medium transition-colors"
-            style={{
-              background: filter === f ? "#1f1f1f" : "transparent",
-              border: filter === f ? "1px solid #333" : "1px solid transparent",
-              color: filter === f ? "#fff" : "#666",
-            }}
-          >
-            {f === "all" ? "All" : f === "open" ? "Open" : "My Bets"}
-          </button>
-        ))}
       </div>
 
       {/* Bet list */}
