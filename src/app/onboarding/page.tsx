@@ -39,7 +39,7 @@ export default function OnboardingPage() {
       return;
     }
     await update({ alias: trimmed });
-    router.replace("/");
+    window.location.replace("/");
   }
 
   return (
