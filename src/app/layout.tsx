@@ -10,6 +10,9 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://banterboys-production.up.railway.app"),
   title: "Banter Boys Bets",
   description: "Sports betting for the Banter Boys guild",
+  openGraph: {
+    images: ["/og-image.png"],
+  },
 };
 
 export default function RootLayout({
