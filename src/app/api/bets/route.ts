@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { EventStatus, PvPBetStatus } from "@prisma/client";
+import {
+  notifyBetCreated,
+  notifyBetJoined,
+  notifyBetCancelled,
+} from "@/lib/discord-notify";
 
 export async function GET() {
   const bets = await prisma.pvPBet.findMany({
@@ -53,6 +58,7 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  notifyBetCreated(bet).catch(() => {});
   return NextResponse.json(bet, { status: 201 });
 }
 
@@ -90,6 +96,7 @@ export async function PATCH(req: NextRequest) {
       },
     });
 
+    notifyBetJoined(updated).catch(() => {});
     return NextResponse.json(updated);
   }
 
@@ -111,8 +118,13 @@ export async function PATCH(req: NextRequest) {
     const updated = await prisma.pvPBet.update({
       where: { id: betId },
       data: { status: PvPBetStatus.CANCELLED },
+      include: {
+        creator: { select: { name: true, alias: true } },
+        event: true,
+      },
     });
 
+    notifyBetCancelled(updated).catch(() => {});
     return NextResponse.json(updated);
   }
 

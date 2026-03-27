@@ -1,5 +1,6 @@
 import { prisma } from "./db";
 import { EventStatus, Pick, PvPBetStatus, SelectionResult } from "@prisma/client";
+import { notifyBetSettled, notifyTicketSettled } from "./discord-notify";
 
 function getWinningPick(homeScore: number, awayScore: number): Pick {
   if (homeScore > awayScore) return Pick.HOME;
@@ -29,6 +30,15 @@ export async function settlePvPBets(eventId: string) {
         settledAt: new Date(),
       },
     });
+    const settled = await prisma.pvPBet.findUnique({
+      where: { id: bet.id },
+      include: {
+        creator: { select: { name: true, alias: true } },
+        acceptor: { select: { name: true, alias: true } },
+        event: true,
+      },
+    });
+    if (settled) notifyBetSettled(settled, creatorWon).catch(() => {});
   }
 
   // Cancel any unmatched open bets for this event
@@ -90,6 +100,16 @@ export async function settleTicketSelections(eventId: string) {
       where: { id: ticketId },
       data: { status, settledAt: new Date() },
     });
+    if (status !== "VOID") {
+      const settled = await prisma.ticket.findUnique({
+        where: { id: ticketId },
+        include: {
+          user: { select: { name: true, alias: true } },
+          selections: { include: { event: true } },
+        },
+      });
+      if (settled) notifyTicketSettled(settled, status).catch(() => {});
+    }
   }
 }
 

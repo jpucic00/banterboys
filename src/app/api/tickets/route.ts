@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { EventStatus } from "@prisma/client";
+import { notifyTicketCreated } from "@/lib/discord-notify";
 
 export async function GET() {
   const session = await auth();
@@ -111,5 +112,6 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  notifyTicketCreated(ticket, session.user).catch(() => {});
   return NextResponse.json(ticket, { status: 201 });
 }
