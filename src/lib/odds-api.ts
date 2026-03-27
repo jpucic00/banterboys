@@ -9,12 +9,9 @@ const SPORT_KEYS = [
   "soccer_uefa_champs_league",
   "soccer_uefa_europa_league",
   "soccer_uefa_europa_conference_league",
-  "soccer_uefa_nations_league",
   "soccer_fifa_world_cup",
-  "soccer_europe_euro_qualification",
-  "soccer_fifa_world_cup_qualification_europe",
+  "soccer_fifa_world_cup_qualifiers_europe",
   "soccer_netherlands_eredivisie",
-  "soccer_international_friendly",
   "mma_mixed_martial_arts",
 ];
 
@@ -106,11 +103,17 @@ export async function fetchSports() {
   return res.json();
 }
 
+const SPORT_REGIONS: Record<string, string> = {
+  mma_mixed_martial_arts: "eu,uk,us",
+};
+const DEFAULT_REGIONS = "eu,uk";
+
 export async function fetchOddsForSport(sportKey: string): Promise<OddsApiEvent[]> {
+  const regions = SPORT_REGIONS[sportKey] ?? DEFAULT_REGIONS;
   const res = await oddsApiFetch((key) => {
     const u = new URL(`${API_BASE}/sports/${sportKey}/odds/`);
     u.searchParams.set("apiKey", key);
-    u.searchParams.set("regions", "eu");
+    u.searchParams.set("regions", regions);
     u.searchParams.set("markets", "h2h");
     u.searchParams.set("oddsFormat", "decimal");
     return u;

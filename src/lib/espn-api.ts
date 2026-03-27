@@ -9,12 +9,9 @@ export const ESPN_SPORT_MAP: Record<string, string> = {
   soccer_uefa_champs_league:                  "soccer/uefa.champions",
   soccer_uefa_europa_league:                  "soccer/uefa.europa",
   soccer_uefa_europa_conference_league:       "soccer/uefa.europa.conf",
-  soccer_uefa_nations_league:                 "soccer/uefa.nations",
   soccer_fifa_world_cup:                      "soccer/fifa.world",
-  soccer_europe_euro_qualification:           "soccer/uefa.euro.qualifier",
-  soccer_fifa_world_cup_qualification_europe: "soccer/fifa.worldq.europe",
+  soccer_fifa_world_cup_qualifiers_europe:    "soccer/fifa.worldq.europe",
   soccer_netherlands_eredivisie:              "soccer/ned.1",
-  soccer_international_friendly:              "soccer/fifa.friendly",
   mma_mixed_martial_arts:                     "mma/ufc",
 };
 
