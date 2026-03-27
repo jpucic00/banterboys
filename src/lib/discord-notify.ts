@@ -1,21 +1,22 @@
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "";
+
+function siteLink(label: "view" | "join" | "slip"): string {
+  if (!BASE_URL) return "";
+  const text =
+    label === "join"
+      ? "Join the bet"
+      : label === "slip"
+      ? "View the bet slip"
+      : "View the bet";
+  return `\n\n${text} on [Banter Boys Bets](${BASE_URL})`;
+}
+
 const COLORS = {
   green: 0x57f287,
   orange: 0xfee75c,
   blue: 0x5865f2,
   red: 0xed4245,
 };
-
-const TIBIA = {
-  amuletOfLoss: "https://tibia.fandom.com/wiki/Special:FilePath/Amulet_of_Loss.gif",
-  crystalCoin: "https://tibia.fandom.com/wiki/Special:FilePath/Crystal_Coin.gif",
-  tibiaCoin: "https://tibia.fandom.com/wiki/Special:FilePath/Tibia_Coin.gif",
-  dice: "https://tibia.fandom.com/wiki/Special:FilePath/Dice.gif",
-  citizen: "https://tibia.fandom.com/wiki/Special:FilePath/Outfit_Citizen_Male_Addon_0.gif",
-};
-
-function payoutIcon(currency: "GOLD" | "TIBIA_COINS"): string {
-  return currency === "TIBIA_COINS" ? TIBIA.tibiaCoin : TIBIA.crystalCoin;
-}
 
 function displayName(user: {
   name?: string | null;
@@ -66,9 +67,8 @@ export async function notifyBetCreated(bet: {
     embeds: [
       {
         title: "⚔️ New Bet Posted",
-        description: `**${creator}** is looking for a challenger. Pick a side and step into the arena.`,
+        description: `**${creator}** is looking for a challenger. Pick a side and step into the arena.${siteLink("join")}`,
         color: COLORS.orange,
-        thumbnail: { url: TIBIA.dice },
         fields: [
           { name: "🧑 Challenger", value: creator, inline: true },
           {
@@ -110,9 +110,8 @@ export async function notifyBetJoined(bet: {
     embeds: [
       {
         title: "🤝 Bet Accepted — It's On!",
-        description: `**${acceptor}** has accepted **${creator}**'s challenge. May the better adventurer win.`,
+        description: `**${acceptor}** has accepted **${creator}**'s challenge. May the better adventurer win.${siteLink("view")}`,
         color: COLORS.blue,
-        thumbnail: { url: TIBIA.citizen },
         fields: [
           { name: "⚔️ Challenger", value: creator, inline: true },
           { name: "🛡️ Acceptor", value: acceptor, inline: true },
@@ -146,9 +145,8 @@ export async function notifyBetCancelled(bet: {
     embeds: [
       {
         title: "🚫 Bet Cancelled",
-        description: `**${creator}** has withdrawn their challenge. The bet has been voided and the stake returned.`,
+        description: `**${creator}** has withdrawn their challenge. The bet has been voided and the stake returned.${siteLink("view")}`,
         color: COLORS.red,
-        thumbnail: { url: TIBIA.citizen },
         fields: [
           { name: "🧑 Cancelled by", value: creator, inline: true },
           {
@@ -205,10 +203,9 @@ export async function notifyBetSettled(
           ? `🏆 ${winnerName} Wins the Bet!`
           : `💀 ${winnerName} Wins the Bet!`,
         description: isWin
-          ? `The dust has settled. **${winnerName}** called it right and collects the spoils. ${loserName} pays up.`
-          : `**${loserName}** did not see this one coming. A worthy lesson in humility — and a lighter coin pouch.`,
+          ? `The dust has settled. **${winnerName}** called it right and collects the spoils. ${loserName} pays up.${siteLink("view")}`
+          : `**${loserName}** did not see this one coming. A worthy lesson in humility — and a lighter coin pouch.${siteLink("view")}`,
         color: isWin ? COLORS.green : COLORS.red,
-        thumbnail: { url: isWin ? payoutIcon(bet.currency) : TIBIA.amuletOfLoss },
         fields: [
           { name: "🥇 Winner", value: winnerName, inline: true },
           { name: "💀 Loser", value: loserName, inline: true },
@@ -255,9 +252,8 @@ export async function notifyTicketCreated(
     embeds: [
       {
         title: "🎟️ Bet Slip Placed",
-        description: `**${userName}** has locked in a ${ticket.selections.length}-leg bet slip. All legs must hit for the payout.`,
+        description: `**${userName}** has locked in a ${ticket.selections.length}-leg bet slip. All legs must hit for the payout.${siteLink("slip")}`,
         color: COLORS.orange,
-        thumbnail: { url: TIBIA.dice },
         fields: [
           { name: "🧑 Player", value: userName, inline: true },
           {
@@ -322,6 +318,7 @@ export async function notifyTicketSettled(
   } else {
     description = `**${userName}** went ${wonCount}/${total}. The slip is broken — no payout today.`;
   }
+  description += siteLink("slip");
 
   await sendWebhook({
     embeds: [
@@ -329,7 +326,6 @@ export async function notifyTicketSettled(
         title: won ? "🎉 Bet Slip Hit — Winner!" : "💀 Bet Slip Busted",
         description,
         color: won ? COLORS.green : COLORS.red,
-        thumbnail: { url: won ? payoutIcon(ticket.currency) : TIBIA.amuletOfLoss },
         fields: [
           { name: "🧑 Player", value: userName, inline: true },
           {
