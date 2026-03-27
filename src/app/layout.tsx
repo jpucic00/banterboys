@@ -7,6 +7,7 @@ import Providers from "@/components/Providers";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://banterboys-production.up.railway.app"),
   title: "Banter Boys Bets",
   description: "Sports betting for the Banter Boys guild",
 };
