@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
 
   for (const sel of selections) {
     const event = await prisma.event.findUnique({ where: { id: sel.eventId } });
-    if (!event || event.status !== EventStatus.UPCOMING) {
+    if (!event || event.status !== EventStatus.UPCOMING || event.commenceTime <= new Date()) {
       return NextResponse.json(
         { error: `Event ${sel.eventId} not available` },
         { status: 400 }

@@ -20,7 +20,6 @@ export async function GET(req: NextRequest) {
       for (const espnEvent of espnEvents) {
         if (!espnEvent.completed) continue;
 
-        // Direct lookup by stored ESPN ID — no fuzzy matching
         const event = await prisma.event.findUnique({
           where: { espnEventId: espnEvent.id },
         });

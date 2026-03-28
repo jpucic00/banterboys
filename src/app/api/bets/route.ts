@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   }
 
   const event = await prisma.event.findUnique({ where: { id: eventId } });
-  if (!event || event.status !== EventStatus.UPCOMING) {
+  if (!event || event.status !== EventStatus.UPCOMING || event.commenceTime <= new Date()) {
     return NextResponse.json(
       { error: "Event not available for betting" },
       { status: 400 }
@@ -72,9 +72,15 @@ export async function PATCH(req: NextRequest) {
   const { betId, action } = body;
 
   if (action === "join") {
-    const bet = await prisma.pvPBet.findUnique({ where: { id: betId } });
+    const bet = await prisma.pvPBet.findUnique({
+      where: { id: betId },
+      include: { event: true },
+    });
     if (!bet || bet.status !== PvPBetStatus.OPEN) {
       return NextResponse.json({ error: "Bet not available" }, { status: 400 });
+    }
+    if (bet.event.status !== EventStatus.UPCOMING || bet.event.commenceTime <= new Date()) {
+      return NextResponse.json({ error: "Event has already started" }, { status: 400 });
     }
     if (bet.creatorId === session.user.id) {
       return NextResponse.json(

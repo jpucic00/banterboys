@@ -67,13 +67,11 @@ export async function GET(req: NextRequest) {
 
       // ── ESPN ID mapping ────────────────────────────────────────────────
       if (sportKey in ESPN_SPORT_MAP) {
-        // Find events for this sport that don't have an ESPN ID yet
         const unmapped = await prisma.event.findMany({
           where: { sportId: sport.id, espnEventId: null },
         });
 
         if (unmapped.length > 0) {
-          // Group by calendar date (YYYYMMDD) to batch ESPN fetches
           const byDate = new Map<string, typeof unmapped>();
           for (const ev of unmapped) {
             const dateStr = ev.commenceTime.toISOString().slice(0, 10).replace(/-/g, "");
@@ -81,11 +79,18 @@ export async function GET(req: NextRequest) {
             byDate.get(dateStr)!.push(ev);
           }
 
+          let mapped = 0;
+          const unmatched: string[] = [];
+
           for (const [dateStr, eventsOnDate] of byDate) {
             const espnEvents = await fetchEspnEventsByDate(sportKey, dateStr);
-            if (espnEvents.length === 0) continue;
 
             for (const ev of eventsOnDate) {
+              if (espnEvents.length === 0) {
+                unmatched.push(`${ev.homeTeam} vs ${ev.awayTeam} (${dateStr}: no ESPN events)`);
+                continue;
+              }
+
               const espnId = findEspnMatch(
                 ev.homeTeam,
                 ev.awayTeam,
@@ -96,12 +101,17 @@ export async function GET(req: NextRequest) {
                 await prisma.event.update({
                   where: { id: ev.id },
                   data: { espnEventId: espnId },
-                }).catch(() => {
-                  // Another event may have claimed this ESPN ID already — skip
-                });
+                }).catch(() => {});
+                mapped++;
+              } else {
+                unmatched.push(`${ev.homeTeam} vs ${ev.awayTeam} (${dateStr})`);
               }
             }
           }
+
+          if (mapped > 0) results[`${sportKey}_espn_mapped`] = mapped;
+          if (unmatched.length > 0) results[`${sportKey}_espn_unmatched`] = unmatched.length;
+          console.log(`[fetch-odds] ${sportKey} ESPN mapping: ${mapped} mapped, unmatched:`, unmatched);
         }
       }
     } catch (error) {

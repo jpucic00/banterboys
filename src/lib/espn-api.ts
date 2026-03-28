@@ -27,7 +27,7 @@ export interface EspnEvent {
 }
 
 interface EspnCompetitor {
-  homeAway: "home" | "away";
+  homeAway?: "home" | "away";
   score: string;
   team?: { displayName: string };
   athlete?: { displayName: string };
@@ -57,8 +57,9 @@ function parseEspnEvents(data: EspnScoreboardResponse): EspnEvent[] {
   for (const event of data.events ?? []) {
     const comp = event.competitions?.[0];
     if (!comp) continue;
-    const home = comp.competitors.find((c) => c.homeAway === "home");
-    const away = comp.competitors.find((c) => c.homeAway === "away");
+    // Use homeAway designation when available (team sports); fall back to index order (MMA)
+    const home = comp.competitors.find((c) => c.homeAway === "home") ?? comp.competitors[0];
+    const away = comp.competitors.find((c) => c.homeAway === "away") ?? comp.competitors[1];
     if (!home || !away) continue;
     results.push({
       id: event.id,
@@ -127,8 +128,18 @@ function levenshtein(a: string, b: string): number {
   return dp[m][n];
 }
 
+const CITY_ABBREV: Record<string, string> = {
+  "la ": "los angeles ",
+  "ny ": "new york ",
+  "nj ": "new jersey ",
+  "sf ": "san francisco ",
+  "kc ": "kansas city ",
+  "tb ": "tampa bay ",
+  "gb ": "green bay ",
+};
+
 function normalizeTeam(name: string): string {
-  return name
+  let n = name
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
@@ -136,6 +147,10 @@ function normalizeTeam(name: string): string {
     .replace(/[^a-z0-9\s]/g, "")
     .replace(/\s+/g, " ")
     .trim();
+  for (const [abbr, full] of Object.entries(CITY_ABBREV)) {
+    if (n.startsWith(abbr)) n = full + n.slice(abbr.length);
+  }
+  return n;
 }
 
 function teamSimilarity(a: string, b: string): number {
@@ -152,7 +167,9 @@ const TEAM_SIMILARITY_THRESHOLD = 0.65;
 const TIME_WINDOW_MS = 24 * 60 * 60 * 1000; // 24h — same calendar day is enough
 
 /** Find the best matching ESPN event for a given Odds API event.
- *  Returns the ESPN event ID if a confident match is found, otherwise null. */
+ *  Returns the ESPN event ID if a confident match is found, otherwise null.
+ *  Tries both normal and reversed competitor order to handle sports (e.g. MMA)
+ *  where home/away designation is arbitrary. */
 export function findEspnMatch(
   homeTeam: string,
   awayTeam: string,
@@ -163,15 +180,19 @@ export function findEspnMatch(
   let bestScore = -1;
 
   for (const e of espnEvents) {
-    // Must be within TIME_WINDOW_MS of each other
     if (Math.abs(e.eventDate.getTime() - commenceTime.getTime()) > TIME_WINDOW_MS) continue;
 
-    const homeSim = teamSimilarity(homeTeam, e.homeTeam);
-    const awaySim = teamSimilarity(awayTeam, e.awayTeam);
+    // Try normal order
+    const h1 = teamSimilarity(homeTeam, e.homeTeam);
+    const a1 = teamSimilarity(awayTeam, e.awayTeam);
+    const score1 = h1 >= TEAM_SIMILARITY_THRESHOLD && a1 >= TEAM_SIMILARITY_THRESHOLD ? h1 + a1 : -1;
 
-    if (homeSim < TEAM_SIMILARITY_THRESHOLD || awaySim < TEAM_SIMILARITY_THRESHOLD) continue;
+    // Try reversed order (covers MMA and other sports with no meaningful home/away)
+    const h2 = teamSimilarity(homeTeam, e.awayTeam);
+    const a2 = teamSimilarity(awayTeam, e.homeTeam);
+    const score2 = h2 >= TEAM_SIMILARITY_THRESHOLD && a2 >= TEAM_SIMILARITY_THRESHOLD ? h2 + a2 : -1;
 
-    const score = homeSim + awaySim;
+    const score = Math.max(score1, score2);
     if (score > bestScore) {
       bestScore = score;
       bestId = e.id;
