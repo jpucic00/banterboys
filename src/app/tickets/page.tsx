@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession, signIn } from "next-auth/react";
 import { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { CoinAmount } from "@/components/CoinIcon";
@@ -272,8 +272,50 @@ export default function TicketsPage() {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   const [sportCategory, setSportCategory] = useState<SportCategory>("all");
+  const [selectedLeague, setSelectedLeague] = useState<string>("all");
 
+  const [removedNotice, setRemovedNotice] = useState<string | null>(null);
   const canInteract = !!session;
+
+  // Load slip from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("betSlip");
+      if (saved) setSlip(JSON.parse(saved));
+      const savedAmount = localStorage.getItem("betSlipAmount");
+      if (savedAmount) setAmount(savedAmount);
+      const savedCurrency = localStorage.getItem("betSlipCurrency");
+      if (savedCurrency) setCurrency(savedCurrency);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Persist slip to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem("betSlip", JSON.stringify(slip));
+    } catch {
+      // ignore
+    }
+    setRemovedNotice(null);
+  }, [slip]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("betSlipAmount", amount);
+    } catch {
+      // ignore
+    }
+  }, [amount]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("betSlipCurrency", currency);
+    } catch {
+      // ignore
+    }
+  }, [currency]);
 
   const loadTickets = useCallback(async () => {
     const res = await fetch("/api/tickets");
@@ -328,6 +370,19 @@ export default function TicketsPage() {
 
   async function handleSubmit() {
     if (slip.length === 0 || !amount) return;
+
+    // Filter out expired events (events no longer in the UPCOMING list)
+    const activeEventIds = new Set(events.map((e) => e.id));
+    const validSlip = slip.filter((s) => activeEventIds.has(s.eventId));
+    const removedSlip = slip.filter((s) => !activeEventIds.has(s.eventId));
+
+    if (removedSlip.length > 0) {
+      setSlip(validSlip);
+      const names = removedSlip.map((s) => s.matchLabel).join(", ");
+      setRemovedNotice(`Removed expired event${removedSlip.length > 1 ? "s" : ""}: ${names}`);
+      return;
+    }
+
     setSubmitting(true);
     try {
       const res = await fetch("/api/tickets", {
@@ -345,6 +400,9 @@ export default function TicketsPage() {
       if (res.ok) {
         setSlip([]);
         setAmount("");
+        localStorage.removeItem("betSlip");
+        localStorage.removeItem("betSlipAmount");
+        localStorage.removeItem("betSlipCurrency");
         loadTickets();
         setTab("mine");
       }
@@ -365,8 +423,17 @@ export default function TicketsPage() {
       ? events
       : events.filter((e) => SPORT_CATEGORIES[e.sport.key] === sportCategory);
 
+  // Derive available leagues within the current sport category filter
+  const availableLeagues = Array.from(new Set(filteredEvents.map((e) => e.sport.key)));
+
+  // Filter further by selected league
+  const leagueFilteredEvents =
+    selectedLeague === "all"
+      ? filteredEvents
+      : filteredEvents.filter((e) => e.sport.key === selectedLeague);
+
   // Group filtered events by sport key
-  const grouped = filteredEvents.reduce<Record<string, Event[]>>((acc, event) => {
+  const grouped = leagueFilteredEvents.reduce<Record<string, Event[]>>((acc, event) => {
     const key = event.sport.key;
     if (!acc[key]) acc[key] = [];
     acc[key].push(event);
@@ -420,7 +487,7 @@ export default function TicketsPage() {
                 return (
                   <button
                     key={sportTab.id}
-                    onClick={() => setSportCategory(sportTab.id)}
+                    onClick={() => { setSportCategory(sportTab.id); setSelectedLeague("all"); }}
                     className={`flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium uppercase tracking-wide whitespace-nowrap transition-colors ${
                       isActive
                         ? "bg-gold text-black"
@@ -433,6 +500,24 @@ export default function TicketsPage() {
                 );
               })}
             </div>
+
+            {/* League filter dropdown */}
+            {availableLeagues.length > 1 && (
+              <div className="mb-3">
+                <select
+                  value={selectedLeague}
+                  onChange={(e) => setSelectedLeague(e.target.value)}
+                  className="w-full bg-surface border border-border text-text-secondary text-xs font-medium uppercase tracking-wide rounded px-3 py-1.5 focus:outline-none focus:border-border-light"
+                >
+                  <option value="all">All Leagues</option>
+                  {availableLeagues.map((leagueKey) => (
+                    <option key={leagueKey} value={leagueKey}>
+                      {LEAGUE_NAMES[leagueKey] ?? leagueKey}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
 
             {Object.keys(grouped).length === 0 && (
               <p className="text-text-muted text-sm py-8 text-center">
@@ -489,7 +574,7 @@ export default function TicketsPage() {
                               label={event.homeTeam}
                               odds={odds.homeOdds}
                               selected={slipPick === "HOME"}
-                              disabled={inSlip || !canInteract}
+                              disabled={inSlip}
                               onClick={() => addToSlip(event, "HOME")}
                             />
                             {odds.drawOdds && (
@@ -497,7 +582,7 @@ export default function TicketsPage() {
                                 label="Draw"
                                 odds={odds.drawOdds}
                                 selected={slipPick === "DRAW"}
-                                disabled={inSlip || !canInteract}
+                                disabled={inSlip}
                                 onClick={() => addToSlip(event, "DRAW")}
                               />
                             )}
@@ -505,7 +590,7 @@ export default function TicketsPage() {
                               label={event.awayTeam}
                               odds={odds.awayOdds}
                               selected={slipPick === "AWAY"}
-                              disabled={inSlip || !canInteract}
+                              disabled={inSlip}
                               onClick={() => addToSlip(event, "AWAY")}
                             />
                           </div>
@@ -570,6 +655,12 @@ export default function TicketsPage() {
 
               {slip.length > 0 && (
                 <>
+                  {removedNotice && (
+                    <div className="text-xs text-loss border border-loss/30 rounded p-2" style={{ background: "#1a0000" }}>
+                      {removedNotice}
+                    </div>
+                  )}
+
                   <div className="flex gap-2">
                     <input
                       type="number"
@@ -602,13 +693,22 @@ export default function TicketsPage() {
                     </div>
                   </div>
 
-                  <button
-                    onClick={handleSubmit}
-                    disabled={submitting || !amount}
-                    className="w-full bg-gold hover:bg-gold-bright text-black py-2 rounded text-sm font-bold uppercase tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {submitting ? "Placing..." : "Place Bet"}
-                  </button>
+                  {canInteract ? (
+                    <button
+                      onClick={handleSubmit}
+                      disabled={submitting || !amount}
+                      className="w-full bg-gold hover:bg-gold-bright text-black py-2 rounded text-sm font-bold uppercase tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {submitting ? "Placing..." : "Place Bet"}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => signIn("discord", { callbackUrl: "/tickets" })}
+                      className="w-full bg-gold hover:bg-gold-bright text-black py-2 rounded text-sm font-bold uppercase tracking-wide transition-colors"
+                    >
+                      Sign in to Place Bet
+                    </button>
+                  )}
                 </>
               )}
             </div>
@@ -710,6 +810,12 @@ export default function TicketsPage() {
               {/* Controls — shrink-0 keeps this always fully visible below the scroll area */}
               {slip.length > 0 && (
                 <div className="shrink-0 p-3 space-y-2">
+                  {removedNotice && (
+                    <div className="text-xs text-loss border border-loss/30 rounded p-2" style={{ background: "#1a0000" }}>
+                      {removedNotice}
+                    </div>
+                  )}
+
                   <div className="flex gap-2">
                     <input
                       type="number"
@@ -742,13 +848,22 @@ export default function TicketsPage() {
                     </div>
                   </div>
 
-                  <button
-                    onClick={handleSubmit}
-                    disabled={submitting || !amount}
-                    className="w-full bg-gold hover:bg-gold-bright text-black py-2 rounded text-sm font-bold uppercase tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {submitting ? "Placing..." : "Place Bet"}
-                  </button>
+                  {canInteract ? (
+                    <button
+                      onClick={handleSubmit}
+                      disabled={submitting || !amount}
+                      className="w-full bg-gold hover:bg-gold-bright text-black py-2 rounded text-sm font-bold uppercase tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {submitting ? "Placing..." : "Place Bet"}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => signIn("discord", { callbackUrl: "/tickets" })}
+                      className="w-full bg-gold hover:bg-gold-bright text-black py-2 rounded text-sm font-bold uppercase tracking-wide transition-colors"
+                    >
+                      Sign in to Place Bet
+                    </button>
+                  )}
                 </div>
               )}
             </>
