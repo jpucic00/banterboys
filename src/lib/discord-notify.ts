@@ -84,7 +84,7 @@ export async function notifyBetCreated(bet: {
           },
           { name: "📈 Odds", value: `x${bet.odds.toFixed(2)}`, inline: true },
           {
-            name: "💎 Potential Winnings",
+            name: "💎 Joiner Commitment",
             value: formatCurrency(Math.round(bet.amount * bet.odds), bet.currency),
             inline: true,
           },
@@ -121,8 +121,13 @@ export async function notifyBetJoined(bet: {
             inline: false,
           },
           {
-            name: "💰 Stake Each",
+            name: "💰 Creator Staked",
             value: formatCurrency(bet.amount, bet.currency),
+            inline: true,
+          },
+          {
+            name: "💎 Joiner Committed",
+            value: formatCurrency(Math.round(bet.amount * bet.odds), bet.currency),
             inline: true,
           },
           { name: "📈 Odds", value: `x${bet.odds.toFixed(2)}`, inline: true },
