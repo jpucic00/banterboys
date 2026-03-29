@@ -5,8 +5,8 @@
   "main": "index.js",
   "scripts": {
     "dev": "next dev",
-    "build": "prisma migrate deploy && next build",
-    "start": "next start",
+    "build": "next build",
+    "start": "prisma migrate deploy && next start",
     "postinstall": "prisma generate"
   },
   "keywords": [],
