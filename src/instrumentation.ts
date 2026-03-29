@@ -17,10 +17,12 @@ export async function register() {
 
     const scoresSchedule = process.env.CRON_SCORES_SCHEDULE ?? "*/5 * * * *";
     const oddsSchedule = process.env.CRON_ODDS_SCHEDULE ?? "0 0 * * *";
+    const cleanupSchedule = process.env.CRON_CLEANUP_SCHEDULE ?? "0 0 * * 0";
 
     cron.default.schedule(scoresSchedule, () => run("/api/cron/fetch-scores"));
     cron.default.schedule(oddsSchedule, () => run("/api/cron/fetch-odds"));
+    cron.default.schedule(cleanupSchedule, () => run("/api/cron/cleanup-unmapped"));
 
-    console.log(`[cron] Scheduled: fetch-scores (${scoresSchedule}), fetch-odds (${oddsSchedule})`);
+    console.log(`[cron] Scheduled: fetch-scores (${scoresSchedule}), fetch-odds (${oddsSchedule}), cleanup-unmapped (${cleanupSchedule})`);
   }
 }

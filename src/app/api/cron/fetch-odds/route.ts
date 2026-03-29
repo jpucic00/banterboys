@@ -109,11 +109,12 @@ export async function GET(req: NextRequest) {
             }
           }
 
-          if (mapped > 0) results[`${sportKey}_espn_mapped`] = mapped;
+              if (mapped > 0) results[`${sportKey}_espn_mapped`] = mapped;
           if (unmatched.length > 0) results[`${sportKey}_espn_unmatched`] = unmatched.length;
           console.log(`[fetch-odds] ${sportKey} ESPN mapping: ${mapped} mapped, unmatched:`, unmatched);
         }
       }
+
     } catch (error) {
       console.error(`Error fetching odds for ${sportKey}:`, error);
       results[sportKey] = -1;

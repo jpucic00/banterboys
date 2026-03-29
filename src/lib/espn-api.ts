@@ -10,7 +10,7 @@ export const ESPN_SPORT_MAP: Record<string, string> = {
   soccer_uefa_europa_league:                  "soccer/uefa.europa",
   soccer_uefa_europa_conference_league:       "soccer/uefa.europa.conf",
   soccer_fifa_world_cup:                      "soccer/fifa.world",
-  soccer_fifa_world_cup_qualifiers_europe:    "soccer/fifa.worldq.europe",
+  soccer_fifa_world_cup_qualifiers_europe:    "soccer/fifa.worldq.uefa",
   soccer_netherlands_eredivisie:              "soccer/ned.1",
   mma_mixed_martial_arts:                     "mma/ufc",
 };
