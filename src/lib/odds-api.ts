@@ -73,9 +73,9 @@ async function oddsApiFetch(
   for (const key of keys) {
     const res = await fetch(buildUrl(key).toString());
 
-    if (res.status === 429) {
+    if (res.status === 429 || res.status === 401) {
       exhausted.push(`...${key.slice(-4)}`);
-      console.warn(`[Odds API] Key ...${key.slice(-4)} rate limited, trying next`);
+      console.warn(`[Odds API] Key ...${key.slice(-4)} ${res.status === 401 ? "out of credits" : "rate limited"}, trying next`);
       continue;
     }
 
@@ -90,7 +90,7 @@ async function oddsApiFetch(
     return res;
   }
 
-  throw new Error(`All Odds API keys rate-limited: [${exhausted.join(", ")}]`);
+  throw new Error(`All Odds API keys exhausted or rate-limited: [${exhausted.join(", ")}]`);
 }
 
 export async function fetchSports() {

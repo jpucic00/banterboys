@@ -1,3 +1,5 @@
+import { ODDS_TO_ESPN_ABBREV, TEAM_NAME_CORRECTIONS } from "./team-aliases";
+
 const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports";
 
 export const ESPN_SPORT_MAP: Record<string, string> = {
@@ -19,6 +21,8 @@ export interface EspnEvent {
   id: string;
   homeTeam: string;
   awayTeam: string;
+  homeAbbrev?: string;
+  awayAbbrev?: string;
   homeScore: number;
   awayScore: number;
   completed: boolean;
@@ -29,11 +33,13 @@ export interface EspnEvent {
 interface EspnCompetitor {
   homeAway?: "home" | "away";
   score: string;
-  team?: { displayName: string };
+  team?: { displayName: string; abbreviation?: string };
   athlete?: { displayName: string };
 }
 
 interface EspnCompetition {
+  id: string;
+  date?: string;
   competitors: EspnCompetitor[];
   status: { type: { completed: boolean; state: "pre" | "in" | "post" } };
 }
@@ -55,22 +61,35 @@ function getCompetitorName(c: EspnCompetitor): string {
 function parseEspnEvents(data: EspnScoreboardResponse): EspnEvent[] {
   const results: EspnEvent[] = [];
   for (const event of data.events ?? []) {
-    const comp = event.competitions?.[0];
-    if (!comp) continue;
-    // Use homeAway designation when available (team sports); fall back to index order (MMA)
-    const home = comp.competitors.find((c) => c.homeAway === "home") ?? comp.competitors[0];
-    const away = comp.competitors.find((c) => c.homeAway === "away") ?? comp.competitors[1];
-    if (!home || !away) continue;
-    results.push({
-      id: event.id,
-      homeTeam: getCompetitorName(home),
-      awayTeam: getCompetitorName(away),
-      homeScore: parseFloat(home.score) || 0,
-      awayScore: parseFloat(away.score) || 0,
-      completed: comp.status.type.completed,
-      inProgress: comp.status.type.state === "in",
-      eventDate: new Date(event.date),
-    });
+    const competitions = event.competitions ?? [];
+    if (competitions.length === 0) continue;
+
+    // Multi-competition events (e.g. UFC fight cards): each competition is a separate
+    // bout — emit one EspnEvent per competition using comp.id and comp.date.
+    // Single-competition events (team sports): use event.id to preserve existing behaviour.
+    const isMultiFight = competitions.length > 1;
+
+    for (const comp of competitions) {
+      // Use homeAway designation when available (team sports); fall back to index order (MMA)
+      const home = comp.competitors.find((c) => c.homeAway === "home") ?? comp.competitors[0];
+      const away = comp.competitors.find((c) => c.homeAway === "away") ?? comp.competitors[1];
+      if (!home || !away) continue;
+      results.push({
+        id: isMultiFight ? comp.id : event.id,
+        homeTeam: getCompetitorName(home),
+        awayTeam: getCompetitorName(away),
+        homeAbbrev: home.team?.abbreviation,
+        awayAbbrev: away.team?.abbreviation,
+        homeScore: parseFloat(home.score) || 0,
+        awayScore: parseFloat(away.score) || 0,
+        completed: comp.status.type.completed,
+        inProgress: comp.status.type.state === "in",
+        eventDate: new Date(comp.date ?? event.date),
+      });
+
+      // For single-competition events, only process the first competition.
+      if (!isMultiFight) break;
+    }
   }
   return results;
 }
@@ -164,32 +183,59 @@ function teamSimilarity(a: string, b: string): number {
 }
 
 const TEAM_SIMILARITY_THRESHOLD = 0.65;
-const TIME_WINDOW_MS = 24 * 60 * 60 * 1000; // 24h — same calendar day is enough
 
 /** Find the best matching ESPN event for a given Odds API event.
  *  Returns the ESPN event ID if a confident match is found, otherwise null.
- *  Tries both normal and reversed competitor order to handle sports (e.g. MMA)
- *  where home/away designation is arbitrary. */
+ *
+ *  Matching strategy (in priority order):
+ *  1. Exact abbreviation match via ODDS_TO_ESPN_ABBREV lookup table (for domestic leagues + NBA)
+ *  2. Fuzzy name similarity fallback (for tournaments, MMA, and any unmapped teams)
+ *
+ *  Time window is 3h for team sports (same kick-off time in both APIs),
+ *  24h for MMA (cards can run long / exact times less reliable). */
 export function findEspnMatch(
   homeTeam: string,
   awayTeam: string,
   commenceTime: Date,
-  espnEvents: EspnEvent[]
+  espnEvents: EspnEvent[],
+  sportKey?: string
 ): string | null {
+  const timeWindowMs = 48 * 60 * 60 * 1000; // 48h — covers ±1 day date boundary differences between Odds API and ESPN
+
+  // ── 1. Abbreviation lookup (exact match, no time window needed) ──────────
+  // homeAbbrev+awayAbbrev uniquely identifies a game within a sport's date range.
+  const sportMap = sportKey ? ODDS_TO_ESPN_ABBREV[sportKey] : undefined;
+  if (sportMap) {
+    const homeAbbrev = sportMap[homeTeam];
+    const awayAbbrev = sportMap[awayTeam];
+    if (homeAbbrev && awayAbbrev) {
+      for (const e of espnEvents) {
+        if (e.homeAbbrev === homeAbbrev && e.awayAbbrev === awayAbbrev) return e.id;
+        if (e.homeAbbrev === awayAbbrev && e.awayAbbrev === homeAbbrev) return e.id; // reversed (MMA-style)
+      }
+    }
+  }
+
+  // ── 2. Fuzzy fallback ─────────────────────────────────────────────────────
+  // Apply known name corrections before similarity scoring to handle structural
+  // divergences that fuzzy matching can't bridge (e.g. "Sporting Lisbon" ↔ "Sporting CP").
+  const correctedHome = TEAM_NAME_CORRECTIONS[homeTeam] ?? homeTeam;
+  const correctedAway = TEAM_NAME_CORRECTIONS[awayTeam] ?? awayTeam;
+
   let bestId: string | null = null;
   let bestScore = -1;
 
   for (const e of espnEvents) {
-    if (Math.abs(e.eventDate.getTime() - commenceTime.getTime()) > TIME_WINDOW_MS) continue;
+    if (Math.abs(e.eventDate.getTime() - commenceTime.getTime()) > timeWindowMs) continue;
 
     // Try normal order
-    const h1 = teamSimilarity(homeTeam, e.homeTeam);
-    const a1 = teamSimilarity(awayTeam, e.awayTeam);
+    const h1 = teamSimilarity(correctedHome, e.homeTeam);
+    const a1 = teamSimilarity(correctedAway, e.awayTeam);
     const score1 = h1 >= TEAM_SIMILARITY_THRESHOLD && a1 >= TEAM_SIMILARITY_THRESHOLD ? h1 + a1 : -1;
 
     // Try reversed order (covers MMA and other sports with no meaningful home/away)
-    const h2 = teamSimilarity(homeTeam, e.awayTeam);
-    const a2 = teamSimilarity(awayTeam, e.homeTeam);
+    const h2 = teamSimilarity(correctedHome, e.awayTeam);
+    const a2 = teamSimilarity(correctedAway, e.homeTeam);
     const score2 = h2 >= TEAM_SIMILARITY_THRESHOLD && a2 >= TEAM_SIMILARITY_THRESHOLD ? h2 + a2 : -1;
 
     const score = Math.max(score1, score2);

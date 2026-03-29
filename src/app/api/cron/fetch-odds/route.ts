@@ -83,7 +83,19 @@ export async function GET(req: NextRequest) {
           const unmatched: string[] = [];
 
           for (const [dateStr, eventsOnDate] of byDate) {
-            const espnEvents = await fetchEspnEventsByDate(sportKey, dateStr);
+            // ESPN uses local date; Odds API uses UTC. A game at 7 PM ET sits in ESPN's
+            // "previous day" bucket, and some APIs store placeholder dates off by ±1 day.
+            // Fetch UTC-1, UTC, and UTC+1 to cover all boundary cases.
+            const baseMs = new Date(`${dateStr.slice(0, 4)}-${dateStr.slice(4, 6)}-${dateStr.slice(6, 8)}T00:00:00Z`).getTime();
+            const prevDateStr = new Date(baseMs - 24 * 60 * 60 * 1000).toISOString().slice(0, 10).replace(/-/g, "");
+            const nextDateStr = new Date(baseMs + 24 * 60 * 60 * 1000).toISOString().slice(0, 10).replace(/-/g, "");
+
+            const [espnPrev, espnCurrent, espnNext] = await Promise.all([
+              fetchEspnEventsByDate(sportKey, prevDateStr),
+              fetchEspnEventsByDate(sportKey, dateStr),
+              fetchEspnEventsByDate(sportKey, nextDateStr),
+            ]);
+            const espnEvents = [...espnPrev, ...espnCurrent, ...espnNext];
 
             for (const ev of eventsOnDate) {
               if (espnEvents.length === 0) {
@@ -95,7 +107,8 @@ export async function GET(req: NextRequest) {
                 ev.homeTeam,
                 ev.awayTeam,
                 ev.commenceTime,
-                espnEvents
+                espnEvents,
+                sportKey
               );
               if (espnId) {
                 await prisma.event.update({
