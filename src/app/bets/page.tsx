@@ -19,7 +19,7 @@ interface Event {
   awayTeam: string;
   commenceTime: string;
   sport: Sport;
-  odds: { homeOdds: number; awayOdds: number; drawOdds: number | null }[];
+  odds: { homeOdds: number; awayOdds: number; drawOdds: number | null; homeDrawOdds: number | null; awayDrawOdds: number | null }[];
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -184,7 +184,7 @@ function CreateBetModal({
   const [selectedType, setSelectedType] = useState("");
   const [selectedSportId, setSelectedSportId] = useState("");
   const [selectedEventId, setSelectedEventId] = useState("");
-  const [selectedPick, setSelectedPick] = useState<"HOME" | "AWAY" | "DRAW" | "">("");
+  const [selectedPick, setSelectedPick] = useState<"HOME" | "AWAY" | "DRAW" | "HOME_DRAW" | "AWAY_DRAW" | "">("");
   const [amount, setAmount] = useState("");
   const [odds, setOdds] = useState("2.00");
   const [currency, setCurrency] = useState<"GOLD" | "TIBIA_COINS">("GOLD");
@@ -250,7 +250,7 @@ function CreateBetModal({
     setStep(STEP.pick);
   }
 
-  function selectPick(pick: "HOME" | "AWAY" | "DRAW") {
+  function selectPick(pick: "HOME" | "AWAY" | "DRAW" | "HOME_DRAW" | "AWAY_DRAW") {
     setSelectedPick(pick);
     setStep(STEP.stake);
   }
@@ -282,6 +282,8 @@ function CreateBetModal({
     selectedPick === "HOME" ? selectedEvent?.homeTeam
     : selectedPick === "AWAY" ? selectedEvent?.awayTeam
     : selectedPick === "DRAW" ? "Draw"
+    : selectedPick === "HOME_DRAW" ? `${selectedEvent?.homeTeam} or Draw`
+    : selectedPick === "AWAY_DRAW" ? `${selectedEvent?.awayTeam} or Draw`
     : "";
 
   const displayStep = step;
@@ -459,43 +461,67 @@ function CreateBetModal({
           )}
 
           {/* Pick step */}
-          {step === STEP.pick && selectedEvent && (
-            <div style={{ display: "grid", gridTemplateColumns: hasDrawOdds ? "1fr 1fr 1fr" : "1fr 1fr", gap: 8 }}>
-              {(
-                [
-                  { value: "HOME" as const, label: selectedEvent.homeTeam, sublabel: "Home win" },
-                  ...(hasDrawOdds ? [{ value: "DRAW" as const, label: "Draw", sublabel: "Draw" }] : []),
-                  { value: "AWAY" as const, label: selectedEvent.awayTeam, sublabel: "Away win" },
-                ]
-              ).map(({ value, label, sublabel }) => {
-                const snap = selectedEvent.odds[0];
-                const mktOdds = snap
-                  ? value === "HOME" ? snap.homeOdds
-                  : value === "AWAY" ? snap.awayOdds
-                  : snap.drawOdds
-                  : null;
-                return (
-                  <button
-                    key={value}
-                    onClick={() => selectPick(value)}
-                    style={{
-                      padding: "12px 8px", borderRadius: 6, textAlign: "center",
-                      background: "#1a1a1a", border: "1px solid #2a2a2a",
-                      cursor: "pointer",
-                    }}
-                  >
-                    <div style={{ fontSize: 9, color: "#555", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>{sublabel}</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", lineHeight: 1.3 }}>{label}</div>
-                    {mktOdds != null && (
-                      <div style={{ fontSize: 11, color: "#888", marginTop: 6, fontFamily: "monospace" }}>
-                        mkt {mktOdds.toFixed(2)}x
-                      </div>
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-          )}
+          {step === STEP.pick && selectedEvent && (() => {
+            const snap = selectedEvent.odds[0];
+            const hasDoubleChance = !!snap?.homeDrawOdds && !!snap?.awayDrawOdds;
+            const picks: { value: "HOME" | "AWAY" | "DRAW" | "HOME_DRAW" | "AWAY_DRAW"; label: string; sublabel: string; mktOdds: number | null }[] = [
+              { value: "HOME", label: selectedEvent.homeTeam, sublabel: "Home win", mktOdds: snap?.homeOdds ?? null },
+              ...(hasDrawOdds ? [{ value: "DRAW" as const, label: "Draw", sublabel: "Draw", mktOdds: snap?.drawOdds ?? null }] : []),
+              { value: "AWAY", label: selectedEvent.awayTeam, sublabel: "Away win", mktOdds: snap?.awayOdds ?? null },
+            ];
+            const dcPicks: typeof picks = hasDoubleChance ? [
+              { value: "HOME_DRAW", label: `${selectedEvent.homeTeam} or Draw`, sublabel: "1X", mktOdds: snap?.homeDrawOdds ?? null },
+              { value: "AWAY_DRAW", label: `${selectedEvent.awayTeam} or Draw`, sublabel: "2X", mktOdds: snap?.awayDrawOdds ?? null },
+            ] : [];
+            return (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ display: "grid", gridTemplateColumns: hasDrawOdds ? "1fr 1fr 1fr" : "1fr 1fr", gap: 8 }}>
+                  {picks.map(({ value, label, sublabel, mktOdds }) => (
+                    <button
+                      key={value}
+                      onClick={() => selectPick(value)}
+                      style={{
+                        padding: "12px 8px", borderRadius: 6, textAlign: "center",
+                        background: "#1a1a1a", border: "1px solid #2a2a2a",
+                        cursor: "pointer",
+                      }}
+                    >
+                      <div style={{ fontSize: 9, color: "#555", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>{sublabel}</div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", lineHeight: 1.3 }}>{label}</div>
+                      {mktOdds != null && (
+                        <div style={{ fontSize: 11, color: "#888", marginTop: 6, fontFamily: "monospace" }}>
+                          mkt {mktOdds.toFixed(2)}x
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+                {dcPicks.length > 0 && (
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                    {dcPicks.map(({ value, label, sublabel, mktOdds }) => (
+                      <button
+                        key={value}
+                        onClick={() => selectPick(value)}
+                        style={{
+                          padding: "12px 8px", borderRadius: 6, textAlign: "center",
+                          background: "#1a1a1a", border: "1px solid #2a2a2a",
+                          cursor: "pointer",
+                        }}
+                      >
+                        <div style={{ fontSize: 9, color: "#555", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>{sublabel}</div>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", lineHeight: 1.3 }}>{label}</div>
+                        {mktOdds != null && (
+                          <div style={{ fontSize: 11, color: "#888", marginTop: 6, fontFamily: "monospace" }}>
+                            mkt {mktOdds.toFixed(2)}x
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
 
           {/* Stake step */}
           {step === STEP.stake && (

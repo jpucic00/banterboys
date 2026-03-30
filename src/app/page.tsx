@@ -245,11 +245,15 @@ function PvPCard({ bet }: { bet: PvPBetWithRelations }) {
   const pick =
     bet.pick === "HOME" ? bet.event.homeTeam
     : bet.pick === "AWAY" ? bet.event.awayTeam
+    : bet.pick === "HOME_DRAW" ? `${bet.event.homeTeam} or Draw`
+    : bet.pick === "AWAY_DRAW" ? `${bet.event.awayTeam} or Draw`
     : "Draw";
 
   const joinerPick =
     bet.pick === "HOME" ? bet.event.awayTeam
     : bet.pick === "AWAY" ? bet.event.homeTeam
+    : bet.pick === "HOME_DRAW" ? bet.event.awayTeam
+    : bet.pick === "AWAY_DRAW" ? bet.event.homeTeam
     : "Either team wins";
 
   const statusLabel =
@@ -407,6 +411,8 @@ function TicketCard({ ticket }: { ticket: TicketWithRelations }) {
           const pick =
             sel.pick === "HOME" ? sel.event.homeTeam
             : sel.pick === "AWAY" ? sel.event.awayTeam
+            : sel.pick === "HOME_DRAW" ? `${sel.event.homeTeam} or Draw`
+            : sel.pick === "AWAY_DRAW" ? `${sel.event.awayTeam} or Draw`
             : "Draw";
           const resultColor =
             sel.result === "WON" ? "text-win"

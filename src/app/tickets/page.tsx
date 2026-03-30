@@ -11,12 +11,14 @@ interface Event {
   awayTeam: string;
   commenceTime: string;
   sport: { name: string; key: string };
-  odds: { homeOdds: number; awayOdds: number; drawOdds: number | null }[];
+  odds: { homeOdds: number; awayOdds: number; drawOdds: number | null; homeDrawOdds: number | null; awayDrawOdds: number | null }[];
 }
+
+type PickType = "HOME" | "AWAY" | "DRAW" | "HOME_DRAW" | "AWAY_DRAW";
 
 interface SlipSelection {
   eventId: string;
-  pick: "HOME" | "AWAY" | "DRAW";
+  pick: PickType;
   odds: number;
   label: string;
   matchLabel: string;
@@ -195,11 +197,11 @@ function TicketCard({ ticket }: { ticket: any }) {
         {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
         {ticket.selections.map((sel: any) => {
           const pickLabel =
-            sel.pick === "HOME"
-              ? sel.event.homeTeam
-              : sel.pick === "AWAY"
-                ? sel.event.awayTeam
-                : "Draw";
+            sel.pick === "HOME" ? sel.event.homeTeam
+            : sel.pick === "AWAY" ? sel.event.awayTeam
+            : sel.pick === "HOME_DRAW" ? `${sel.event.homeTeam} or Draw`
+            : sel.pick === "AWAY_DRAW" ? `${sel.event.awayTeam} or Draw`
+            : "Draw";
           const resultColor =
             sel.result === "WON"
               ? "text-win"
@@ -329,25 +331,26 @@ export default function TicketsPage() {
     if (canInteract) loadTickets();
   }, [loadTickets, canInteract]);
 
-  function addToSlip(event: Event, pick: "HOME" | "AWAY" | "DRAW") {
+  function addToSlip(event: Event, pick: PickType) {
     if (slip.some((s) => s.eventId === event.id)) return;
     const latestOdds = event.odds[0];
     if (!latestOdds) return;
 
     const odds =
-      pick === "HOME"
-        ? latestOdds.homeOdds
-        : pick === "AWAY"
-          ? latestOdds.awayOdds
-          : latestOdds.drawOdds;
+      pick === "HOME" ? latestOdds.homeOdds
+      : pick === "AWAY" ? latestOdds.awayOdds
+      : pick === "DRAW" ? latestOdds.drawOdds
+      : pick === "HOME_DRAW" ? latestOdds.homeDrawOdds
+      : pick === "AWAY_DRAW" ? latestOdds.awayDrawOdds
+      : null;
     if (!odds) return;
 
     const label =
-      pick === "HOME"
-        ? event.homeTeam
-        : pick === "AWAY"
-          ? event.awayTeam
-          : "Draw";
+      pick === "HOME" ? event.homeTeam
+      : pick === "AWAY" ? event.awayTeam
+      : pick === "DRAW" ? "Draw"
+      : pick === "HOME_DRAW" ? `${event.homeTeam} or Draw`
+      : `${event.awayTeam} or Draw`;
 
     setSlip([
       ...slip,
@@ -569,30 +572,50 @@ export default function TicketsPage() {
 
                         {/* Odds buttons */}
                         {odds && (
-                          <div className="flex gap-2">
-                            <OddsButton
-                              label={event.homeTeam}
-                              odds={odds.homeOdds}
-                              selected={slipPick === "HOME"}
-                              disabled={inSlip}
-                              onClick={() => addToSlip(event, "HOME")}
-                            />
-                            {odds.drawOdds && (
+                          <div className="space-y-2">
+                            <div className="flex gap-2">
                               <OddsButton
-                                label="Draw"
-                                odds={odds.drawOdds}
-                                selected={slipPick === "DRAW"}
+                                label={event.homeTeam}
+                                odds={odds.homeOdds}
+                                selected={slipPick === "HOME"}
                                 disabled={inSlip}
-                                onClick={() => addToSlip(event, "DRAW")}
+                                onClick={() => addToSlip(event, "HOME")}
                               />
+                              {odds.drawOdds && (
+                                <OddsButton
+                                  label="Draw"
+                                  odds={odds.drawOdds}
+                                  selected={slipPick === "DRAW"}
+                                  disabled={inSlip}
+                                  onClick={() => addToSlip(event, "DRAW")}
+                                />
+                              )}
+                              <OddsButton
+                                label={event.awayTeam}
+                                odds={odds.awayOdds}
+                                selected={slipPick === "AWAY"}
+                                disabled={inSlip}
+                                onClick={() => addToSlip(event, "AWAY")}
+                              />
+                            </div>
+                            {odds.homeDrawOdds && odds.awayDrawOdds && (
+                              <div className="flex gap-2">
+                                <OddsButton
+                                  label="1X"
+                                  odds={odds.homeDrawOdds}
+                                  selected={slipPick === "HOME_DRAW"}
+                                  disabled={inSlip}
+                                  onClick={() => addToSlip(event, "HOME_DRAW")}
+                                />
+                                <OddsButton
+                                  label="2X"
+                                  odds={odds.awayDrawOdds}
+                                  selected={slipPick === "AWAY_DRAW"}
+                                  disabled={inSlip}
+                                  onClick={() => addToSlip(event, "AWAY_DRAW")}
+                                />
+                              </div>
                             )}
-                            <OddsButton
-                              label={event.awayTeam}
-                              odds={odds.awayOdds}
-                              selected={slipPick === "AWAY"}
-                              disabled={inSlip}
-                              onClick={() => addToSlip(event, "AWAY")}
-                            />
                           </div>
                         )}
                       </div>

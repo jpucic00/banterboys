@@ -72,12 +72,14 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    let odds: number;
+    let odds: number | null = null;
     if (sel.pick === "HOME") odds = latestOdds.homeOdds;
     else if (sel.pick === "AWAY") odds = latestOdds.awayOdds;
-    else if (sel.pick === "DRAW" && latestOdds.drawOdds)
-      odds = latestOdds.drawOdds;
-    else {
+    else if (sel.pick === "DRAW") odds = latestOdds.drawOdds;
+    else if (sel.pick === "HOME_DRAW") odds = latestOdds.homeDrawOdds;
+    else if (sel.pick === "AWAY_DRAW") odds = latestOdds.awayDrawOdds;
+
+    if (!odds) {
       return NextResponse.json(
         { error: `Invalid pick for event` },
         { status: 400 }
@@ -100,7 +102,7 @@ export async function POST(req: NextRequest) {
       selections: {
         create: validSelections.map((s) => ({
           eventId: s.eventId,
-          pick: s.pick as "HOME" | "AWAY" | "DRAW",
+          pick: s.pick as "HOME" | "AWAY" | "DRAW" | "HOME_DRAW" | "AWAY_DRAW",
           odds: s.odds,
         })),
       },

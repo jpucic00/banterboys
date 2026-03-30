@@ -100,18 +100,18 @@ export default function BetCard({ bet, onJoin, onCancel }: BetCardProps) {
     (bet.status === "WON_CREATOR" && isAcceptor);
 
   const pickLabel =
-    bet.pick === "HOME"
-      ? bet.event.homeTeam
-      : bet.pick === "AWAY"
-        ? bet.event.awayTeam
-        : "Draw";
+    bet.pick === "HOME" ? bet.event.homeTeam
+    : bet.pick === "AWAY" ? bet.event.awayTeam
+    : bet.pick === "HOME_DRAW" ? `${bet.event.homeTeam} or Draw`
+    : bet.pick === "AWAY_DRAW" ? `${bet.event.awayTeam} or Draw`
+    : "Draw";
 
   const joinerPickLabel =
-    bet.pick === "HOME"
-      ? bet.event.awayTeam
-      : bet.pick === "AWAY"
-        ? bet.event.homeTeam
-        : "Either team wins";
+    bet.pick === "HOME" ? bet.event.awayTeam
+    : bet.pick === "AWAY" ? bet.event.homeTeam
+    : bet.pick === "HOME_DRAW" ? bet.event.awayTeam
+    : bet.pick === "AWAY_DRAW" ? bet.event.homeTeam
+    : "Either team wins";
 
   const borderColor =
     bet.status === "WON_CREATOR" || bet.status === "WON_ACCEPTOR"

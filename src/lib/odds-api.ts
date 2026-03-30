@@ -110,11 +110,12 @@ const DEFAULT_REGIONS = "eu,uk";
 
 export async function fetchOddsForSport(sportKey: string): Promise<OddsApiEvent[]> {
   const regions = SPORT_REGIONS[sportKey] ?? DEFAULT_REGIONS;
+  const markets = "h2h";
   const res = await oddsApiFetch((key) => {
     const u = new URL(`${API_BASE}/sports/${sportKey}/odds/`);
     u.searchParams.set("apiKey", key);
     u.searchParams.set("regions", regions);
-    u.searchParams.set("markets", "h2h");
+    u.searchParams.set("markets", markets);
     u.searchParams.set("oddsFormat", "decimal");
     return u;
   });

@@ -66,11 +66,11 @@ export default async function HistoryPage() {
                     {bet.acceptor?.name ?? "-"}
                   </td>
                   <td className="py-3 pr-4 text-gold">
-                    {bet.pick === "HOME"
-                      ? bet.event.homeTeam
-                      : bet.pick === "AWAY"
-                        ? bet.event.awayTeam
-                        : "Draw"}
+                    {bet.pick === "HOME" ? bet.event.homeTeam
+                      : bet.pick === "AWAY" ? bet.event.awayTeam
+                      : bet.pick === "HOME_DRAW" ? `${bet.event.homeTeam} or Draw`
+                      : bet.pick === "AWAY_DRAW" ? `${bet.event.awayTeam} or Draw`
+                      : "Draw"}
                   </td>
                   <td className="py-3 pr-4 text-text-primary">
                     <CoinAmount amount={bet.amount} currency={bet.currency} />
@@ -148,11 +148,11 @@ export default async function HistoryPage() {
                       <span className="text-text-muted">
                         {sel.event.homeTeam} vs {sel.event.awayTeam} &rarr;{" "}
                         <span className="text-gold">
-                          {sel.pick === "HOME"
-                            ? sel.event.homeTeam
-                            : sel.pick === "AWAY"
-                              ? sel.event.awayTeam
-                              : "Draw"}
+                          {sel.pick === "HOME" ? sel.event.homeTeam
+                            : sel.pick === "AWAY" ? sel.event.awayTeam
+                            : sel.pick === "HOME_DRAW" ? `${sel.event.homeTeam} or Draw`
+                            : sel.pick === "AWAY_DRAW" ? `${sel.event.awayTeam} or Draw`
+                            : "Draw"}
                         </span>
                       </span>
                       <span

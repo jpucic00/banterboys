@@ -29,6 +29,8 @@ function pickLabel(pick: string): string {
   if (pick === "HOME") return "1";
   if (pick === "DRAW") return "X";
   if (pick === "AWAY") return "2";
+  if (pick === "HOME_DRAW") return "1X";
+  if (pick === "AWAY_DRAW") return "2X";
   return pick;
 }
 

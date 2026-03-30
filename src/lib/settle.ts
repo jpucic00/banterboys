@@ -8,19 +8,28 @@ function getWinningPick(homeScore: number, awayScore: number): Pick {
   return Pick.DRAW;
 }
 
+function doesPickWin(pick: Pick, homeScore: number, awayScore: number): boolean {
+  const result = getWinningPick(homeScore, awayScore);
+  switch (pick) {
+    case Pick.HOME:      return result === Pick.HOME;
+    case Pick.AWAY:      return result === Pick.AWAY;
+    case Pick.DRAW:      return result === Pick.DRAW;
+    case Pick.HOME_DRAW: return result === Pick.HOME || result === Pick.DRAW;
+    case Pick.AWAY_DRAW: return result === Pick.AWAY || result === Pick.DRAW;
+  }
+}
+
 export async function settlePvPBets(eventId: string) {
   const event = await prisma.event.findUnique({ where: { id: eventId } });
   if (!event || event.status !== EventStatus.COMPLETED) return;
   if (event.homeScore === null || event.awayScore === null) return;
-
-  const winningPick = getWinningPick(event.homeScore, event.awayScore);
 
   const matchedBets = await prisma.pvPBet.findMany({
     where: { eventId, status: PvPBetStatus.MATCHED },
   });
 
   for (const bet of matchedBets) {
-    const creatorWon = bet.pick === winningPick;
+    const creatorWon = doesPickWin(bet.pick, event.homeScore, event.awayScore);
     await prisma.pvPBet.update({
       where: { id: bet.id },
       data: {
@@ -53,15 +62,13 @@ export async function settleTicketSelections(eventId: string) {
   if (!event || event.status !== EventStatus.COMPLETED) return;
   if (event.homeScore === null || event.awayScore === null) return;
 
-  const winningPick = getWinningPick(event.homeScore, event.awayScore);
-
   const selections = await prisma.ticketSelection.findMany({
     where: { eventId, result: SelectionResult.PENDING },
     include: { ticket: true },
   });
 
   for (const sel of selections) {
-    const won = sel.pick === winningPick;
+    const won = doesPickWin(sel.pick, event.homeScore!, event.awayScore!);
     await prisma.ticketSelection.update({
       where: { id: sel.id },
       data: { result: won ? SelectionResult.WON : SelectionResult.LOST },

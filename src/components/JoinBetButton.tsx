@@ -86,11 +86,15 @@ export default function JoinBetButton({
   const openerPickLabel =
     creatorPick === "HOME" ? homeTeam
     : creatorPick === "AWAY" ? awayTeam
+    : creatorPick === "HOME_DRAW" ? `${homeTeam} or Draw`
+    : creatorPick === "AWAY_DRAW" ? `${awayTeam} or Draw`
     : "Draw";
 
   const joinerPickLabel =
     creatorPick === "HOME" ? awayTeam
     : creatorPick === "AWAY" ? homeTeam
+    : creatorPick === "HOME_DRAW" ? awayTeam
+    : creatorPick === "AWAY_DRAW" ? homeTeam
     : "Either team wins";
 
   // Financials from joiner's perspective

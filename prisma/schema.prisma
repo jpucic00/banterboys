@@ -23,6 +23,8 @@ enum Pick {
   HOME
   AWAY
   DRAW
+  HOME_DRAW
+  AWAY_DRAW
 }
 
 enum Currency {
@@ -138,13 +140,15 @@ model Event {
 }
 
 model OddsSnapshot {
-  id        String   @id @default(cuid())
-  eventId   String
-  homeOdds  Float
-  awayOdds  Float
-  drawOdds  Float?
-  bookmaker String
-  fetchedAt DateTime @default(now())
+  id           String   @id @default(cuid())
+  eventId      String
+  homeOdds     Float
+  awayOdds     Float
+  drawOdds     Float?
+  homeDrawOdds Float?
+  awayDrawOdds Float?
+  bookmaker    String
+  fetchedAt    DateTime @default(now())
 
   event Event @relation(fields: [eventId], references: [id])
 
