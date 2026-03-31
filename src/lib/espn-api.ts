@@ -33,8 +33,21 @@ export interface EspnEvent {
 interface EspnCompetitor {
   homeAway?: "home" | "away";
   score: string;
+  linescores?: Array<{ value: number }>;
   team?: { displayName: string; abbreviation?: string };
   athlete?: { displayName: string };
+}
+
+function isSoccerSport(sportKey: string): boolean {
+  return sportKey.startsWith("soccer_");
+}
+
+function getRegulationScore(competitor: EspnCompetitor): number {
+  const linescores = competitor.linescores;
+  if (linescores && linescores.length >= 2) {
+    return linescores[0].value + linescores[1].value;
+  }
+  return parseFloat(competitor.score) || 0;
 }
 
 interface EspnCompetition {
@@ -58,7 +71,7 @@ function getCompetitorName(c: EspnCompetitor): string {
   return c.team?.displayName ?? c.athlete?.displayName ?? "";
 }
 
-function parseEspnEvents(data: EspnScoreboardResponse): EspnEvent[] {
+function parseEspnEvents(data: EspnScoreboardResponse, sportKey: string): EspnEvent[] {
   const results: EspnEvent[] = [];
   for (const event of data.events ?? []) {
     const competitions = event.competitions ?? [];
@@ -80,8 +93,8 @@ function parseEspnEvents(data: EspnScoreboardResponse): EspnEvent[] {
         awayTeam: getCompetitorName(away),
         homeAbbrev: home.team?.abbreviation,
         awayAbbrev: away.team?.abbreviation,
-        homeScore: parseFloat(home.score) || 0,
-        awayScore: parseFloat(away.score) || 0,
+        homeScore: isSoccerSport(sportKey) ? getRegulationScore(home) : (parseFloat(home.score) || 0),
+        awayScore: isSoccerSport(sportKey) ? getRegulationScore(away) : (parseFloat(away.score) || 0),
         completed: comp.status.type.completed,
         inProgress: comp.status.type.state === "in",
         eventDate: new Date(comp.date ?? event.date),
@@ -106,7 +119,7 @@ export async function fetchEspnEventsByDate(
     const res = await fetch(url);
     if (!res.ok) return [];
     const data: EspnScoreboardResponse = await res.json();
-    return parseEspnEvents(data);
+    return parseEspnEvents(data, sportKey);
   } catch {
     return [];
   }
