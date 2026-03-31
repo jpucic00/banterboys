@@ -28,12 +28,12 @@ export interface EspnEvent {
   completed: boolean;
   inProgress: boolean;
   eventDate: Date;
+  wentToExtraTime: boolean;
 }
 
 interface EspnCompetitor {
   homeAway?: "home" | "away";
   score: string;
-  linescores?: Array<{ value: number }>;
   team?: { displayName: string; abbreviation?: string };
   athlete?: { displayName: string };
 }
@@ -42,19 +42,19 @@ function isSoccerSport(sportKey: string): boolean {
   return sportKey.startsWith("soccer_");
 }
 
-function getRegulationScore(competitor: EspnCompetitor): number {
-  const linescores = competitor.linescores;
-  if (linescores && linescores.length >= 2) {
-    return linescores[0].value + linescores[1].value;
-  }
-  return parseFloat(competitor.score) || 0;
-}
+/** ESPN status names that indicate the match went beyond 90 minutes */
+const EXTRA_TIME_STATUSES = new Set([
+  "STATUS_OVERTIME",
+  "STATUS_FULL_TIME_ET",
+  "STATUS_PENALTIES",
+  "STATUS_FULL_TIME_PEN",
+]);
 
 interface EspnCompetition {
   id: string;
   date?: string;
   competitors: EspnCompetitor[];
-  status: { type: { completed: boolean; state: "pre" | "in" | "post" } };
+  status: { type: { completed: boolean; state: "pre" | "in" | "post"; name?: string } };
 }
 
 interface EspnRawEvent {
@@ -93,11 +93,12 @@ function parseEspnEvents(data: EspnScoreboardResponse, sportKey: string): EspnEv
         awayTeam: getCompetitorName(away),
         homeAbbrev: home.team?.abbreviation,
         awayAbbrev: away.team?.abbreviation,
-        homeScore: isSoccerSport(sportKey) ? getRegulationScore(home) : (parseFloat(home.score) || 0),
-        awayScore: isSoccerSport(sportKey) ? getRegulationScore(away) : (parseFloat(away.score) || 0),
+        homeScore: parseFloat(home.score) || 0,
+        awayScore: parseFloat(away.score) || 0,
         completed: comp.status.type.completed,
         inProgress: comp.status.type.state === "in",
         eventDate: new Date(comp.date ?? event.date),
+        wentToExtraTime: isSoccerSport(sportKey) && EXTRA_TIME_STATUSES.has(comp.status.type.name ?? ""),
       });
 
       // For single-competition events, only process the first competition.

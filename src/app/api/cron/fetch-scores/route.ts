@@ -25,11 +25,21 @@ export async function GET(req: NextRequest) {
         });
         if (!event || event.status === EventStatus.COMPLETED) continue;
 
+        // If a soccer match went to extra time/penalties, regulation ended as a draw.
+        // Store equal scores so bets settle on the 90-minute result.
+        let homeScore = Math.round(espnEvent.homeScore);
+        let awayScore = Math.round(espnEvent.awayScore);
+        if (espnEvent.wentToExtraTime) {
+          const drawScore = Math.min(homeScore, awayScore);
+          homeScore = drawScore;
+          awayScore = drawScore;
+        }
+
         await prisma.event.update({
           where: { id: event.id },
           data: {
-            homeScore: Math.round(espnEvent.homeScore),
-            awayScore: Math.round(espnEvent.awayScore),
+            homeScore,
+            awayScore,
             status: EventStatus.COMPLETED,
             completedAt: new Date(),
           },
