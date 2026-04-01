@@ -22,6 +22,8 @@ export const TEAM_NAME_CORRECTIONS: Record<string, string> = {
   "Sporting Lisbon": "Sporting CP",
   // National team name divergence (Odds API abbreviation vs ESPN full name)
   "USA": "United States",
+  "Czech Republic": "Czechia",
+  "DR Congo": "Congo DR",
   // MMA fighter name divergence (nickname vs legal name, full name vs shortened)
   "Lupita Godinez": "Loopy Godínez",
   "Paulo Henrique Costa": "Paulo Costa",
