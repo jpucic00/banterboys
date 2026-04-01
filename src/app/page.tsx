@@ -130,6 +130,7 @@ export default async function Home() {
 
 const LEAGUE_LABELS: Record<string, string> = {
   soccer_epl:                           "Premier League",
+  soccer_fa_cup:                        "FA Cup",
   soccer_spain_la_liga:                 "La Liga",
   soccer_germany_bundesliga:            "Bundesliga",
   soccer_france_ligue_one:              "Ligue 1",

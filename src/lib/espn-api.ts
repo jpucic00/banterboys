@@ -5,6 +5,7 @@ const ESPN_BASE = "https://site.api.espn.com/apis/site/v2/sports";
 export const ESPN_SPORT_MAP: Record<string, string> = {
   basketball_nba:                             "basketball/nba",
   soccer_epl:                                 "soccer/eng.1",
+  soccer_fa_cup:                              "soccer/eng.fa",
   soccer_spain_la_liga:                       "soccer/esp.1",
   soccer_germany_bundesliga:                  "soccer/ger.1",
   soccer_italy_serie_a:                       "soccer/ita.1",

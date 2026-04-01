@@ -30,6 +30,7 @@ type SportCategory = "all" | "basketball" | "football" | "tennis" | "mma";
 const SPORT_CATEGORIES: Record<string, SportCategory> = {
   basketball_nba: "basketball",
   soccer_epl: "football",
+  soccer_fa_cup: "football",
   soccer_spain_la_liga: "football",
   soccer_germany_bundesliga: "football",
   soccer_italy_serie_a: "football",
@@ -48,6 +49,7 @@ const SPORT_CATEGORIES: Record<string, SportCategory> = {
 const LEAGUE_NAMES: Record<string, string> = {
   basketball_nba: "NBA",
   soccer_epl: "Premier League",
+  soccer_fa_cup: "FA Cup",
   soccer_spain_la_liga: "La Liga",
   soccer_germany_bundesliga: "Bundesliga",
   soccer_italy_serie_a: "Serie A",

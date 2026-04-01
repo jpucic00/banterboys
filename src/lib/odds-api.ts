@@ -3,6 +3,7 @@ const API_BASE = "https://api.the-odds-api.com/v4";
 const SPORT_KEYS = [
   "basketball_nba",
   "soccer_epl",
+  "soccer_fa_cup",
   "soccer_spain_la_liga",
   "soccer_germany_bundesliga",
   "soccer_italy_serie_a",
