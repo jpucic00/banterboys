@@ -3,12 +3,25 @@ import Link from "next/link";
 import Image from "next/image";
 import { CoinAmount } from "@/components/CoinIcon";
 import JoinBetButton from "@/components/JoinBetButton";
+import OverviewFilterButtons from "@/components/OverviewFilterButtons";
+import { Suspense } from "react";
 
 export const dynamic = "force-dynamic";
 
-export default async function Home() {
+const ACTIVE_PVP_STATUSES = ["OPEN", "MATCHED"];
+const ACTIVE_TICKET_STATUSES = ["PENDING"];
+
+export default async function Home({
+  searchParams,
+}: {
+  searchParams: Promise<{ filter?: string }>;
+}) {
+  const { filter: filterParam } = await searchParams;
+  const filter = filterParam === "all" ? "all" : "active";
+
   const [pvpBets, tickets] = await Promise.all([
     prisma.pvPBet.findMany({
+      where: filter === "active" ? { status: { in: ACTIVE_PVP_STATUSES } } : undefined,
       include: {
         creator: { select: { id: true, name: true, alias: true, image: true } },
         acceptor: { select: { id: true, name: true, alias: true, image: true } },
@@ -18,6 +31,7 @@ export default async function Home() {
       take: 30,
     }),
     prisma.ticket.findMany({
+      where: filter === "active" ? { status: { in: ACTIVE_TICKET_STATUSES } } : undefined,
       include: {
         user: { select: { name: true, alias: true, image: true } },
         selections: { include: { event: { include: { sport: true } } } },
@@ -104,12 +118,17 @@ export default async function Home() {
 
       {/* History feed */}
       <div className="pt-2">
-        <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted mb-3">
-          Recent Activity
-        </h2>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-xs font-bold uppercase tracking-widest text-text-muted">
+            Recent Activity
+          </h2>
+          <Suspense fallback={null}>
+            <OverviewFilterButtons current={filter} />
+          </Suspense>
+        </div>
 
         {feed.length === 0 && (
-          <p className="text-text-muted text-sm text-center py-10">No settled bets yet.</p>
+          <p className="text-text-muted text-sm text-center py-10">No bets yet.</p>
         )}
 
         <div className="space-y-2">
