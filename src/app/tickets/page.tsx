@@ -25,12 +25,13 @@ interface SlipSelection {
 }
 
 // Sport category mapping
-type SportCategory = "all" | "basketball" | "football" | "tennis" | "mma";
+type SportCategory = "all" | "basketball" | "football" | "hockey" | "tennis" | "mma";
 
 const SPORT_CATEGORIES: Record<string, SportCategory> = {
   basketball_nba: "basketball",
   soccer_epl: "football",
   soccer_fa_cup: "football",
+  soccer_brazil_campeonato: "football",
   soccer_spain_la_liga: "football",
   soccer_germany_bundesliga: "football",
   soccer_italy_serie_a: "football",
@@ -40,6 +41,7 @@ const SPORT_CATEGORIES: Record<string, SportCategory> = {
   soccer_fifa_world_cup: "football",
   soccer_fifa_world_cup_qualifiers_europe: "football",
   soccer_netherlands_eredivisie: "football",
+  icehockey_nhl: "hockey",
   tennis_atp_french_open: "tennis",
   tennis_atp_wimbledon: "tennis",
   tennis_atp_us_open: "tennis",
@@ -50,6 +52,7 @@ const LEAGUE_NAMES: Record<string, string> = {
   basketball_nba: "NBA",
   soccer_epl: "Premier League",
   soccer_fa_cup: "FA Cup",
+  soccer_brazil_campeonato: "Brasileirão",
   soccer_spain_la_liga: "La Liga",
   soccer_germany_bundesliga: "Bundesliga",
   soccer_italy_serie_a: "Serie A",
@@ -59,6 +62,7 @@ const LEAGUE_NAMES: Record<string, string> = {
   soccer_fifa_world_cup: "FIFA World Cup",
   soccer_fifa_world_cup_qualifiers_europe: "WC Qualification",
   soccer_netherlands_eredivisie: "Eredivisie",
+  icehockey_nhl: "NHL",
   tennis_atp_french_open: "French Open",
   tennis_atp_wimbledon: "Wimbledon",
   tennis_atp_us_open: "US Open",
@@ -113,10 +117,19 @@ function IconMMA({ className }: { className?: string }) {
   );
 }
 
+function IconHockey({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d="M4 20l4-16h2l-3 12h10l-3-12h2l4 16H4z" />
+    </svg>
+  );
+}
+
 const SPORT_TABS: { id: SportCategory; label: string; Icon: React.FC<{ className?: string }> }[] = [
   { id: "all", label: "All", Icon: ({ className }) => <span className={className}>★</span> },
   { id: "basketball", label: "NBA", Icon: IconBasketball },
   { id: "football", label: "Football", Icon: IconFootball },
+  { id: "hockey", label: "NHL", Icon: IconHockey },
   { id: "tennis", label: "Tennis", Icon: IconTennis },
   { id: "mma", label: "MMA", Icon: IconMMA },
 ];
@@ -126,6 +139,7 @@ function LeagueIcon({ sportKey }: { sportKey: string }) {
   const cls = "w-3.5 h-3.5";
   if (cat === "basketball") return <IconBasketball className={cls} />;
   if (cat === "football") return <IconFootball className={cls} />;
+  if (cat === "hockey") return <IconHockey className={cls} />;
   if (cat === "tennis") return <IconTennis className={cls} />;
   if (cat === "mma") return <IconMMA className={cls} />;
   return null;
@@ -718,6 +732,12 @@ export default function TicketsPage() {
                     </div>
                   </div>
 
+                  {potentialPayout > 100_000_000 && (
+                    <p className="text-xs text-yellow-400 border border-yellow-400/30 rounded p-2 leading-relaxed">
+                      Bets with a payout above 100kk require admin approval via Discord before they are confirmed.
+                    </p>
+                  )}
+
                   {canInteract ? (
                     <button
                       onClick={handleSubmit}
@@ -872,6 +892,12 @@ export default function TicketsPage() {
                       </span>
                     </div>
                   </div>
+
+                  {potentialPayout > 100_000_000 && (
+                    <p className="text-xs text-yellow-400 border border-yellow-400/30 rounded p-2 leading-relaxed">
+                      Bets with a payout above 100kk require admin approval via Discord before they are confirmed.
+                    </p>
+                  )}
 
                   {canInteract ? (
                     <button

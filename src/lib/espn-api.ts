@@ -6,6 +6,7 @@ export const ESPN_SPORT_MAP: Record<string, string> = {
   basketball_nba:                             "basketball/nba",
   soccer_epl:                                 "soccer/eng.1",
   soccer_fa_cup:                              "soccer/eng.fa",
+  soccer_brazil_campeonato:                   "soccer/bra.1",
   soccer_spain_la_liga:                       "soccer/esp.1",
   soccer_germany_bundesliga:                  "soccer/ger.1",
   soccer_italy_serie_a:                       "soccer/ita.1",
@@ -15,6 +16,7 @@ export const ESPN_SPORT_MAP: Record<string, string> = {
   soccer_fifa_world_cup:                      "soccer/fifa.world",
   soccer_fifa_world_cup_qualifiers_europe:    "soccer/fifa.worldq.uefa",
   soccer_netherlands_eredivisie:              "soccer/ned.1",
+  icehockey_nhl:                              "hockey/nhl",
   mma_mixed_martial_arts:                     "mma/ufc",
 };
 

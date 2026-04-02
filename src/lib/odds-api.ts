@@ -4,6 +4,7 @@ const SPORT_KEYS = [
   "basketball_nba",
   "soccer_epl",
   "soccer_fa_cup",
+  "soccer_brazil_campeonato",
   "soccer_spain_la_liga",
   "soccer_germany_bundesliga",
   "soccer_italy_serie_a",
@@ -13,6 +14,7 @@ const SPORT_KEYS = [
   "soccer_fifa_world_cup",
   "soccer_fifa_world_cup_qualifiers_europe",
   "soccer_netherlands_eredivisie",
+  "icehockey_nhl",
   "mma_mixed_martial_arts",
 ];
 
