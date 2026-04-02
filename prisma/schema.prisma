@@ -160,10 +160,12 @@ model PvPBet {
   creatorId  String
   acceptorId String?
   eventId    String
-  pick       Pick
-  amount     Float
-  odds       Float
-  currency   Currency     @default(GOLD)
+  pick         Pick
+  amount       Float
+  odds         Float
+  joinerPick   Pick?
+  joinerAmount Float?
+  currency     Currency     @default(GOLD)
   status     PvPBetStatus @default(OPEN)
   createdAt  DateTime     @default(now())
   settledAt  DateTime?

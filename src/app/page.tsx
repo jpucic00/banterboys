@@ -229,6 +229,8 @@ type PvPBetWithRelations = {
   pick: string;
   amount: number;
   odds: number;
+  joinerPick?: string | null;
+  joinerAmount?: number | null;
   currency: string;
   createdAt: Date;
   settledAt: Date | null;
@@ -250,12 +252,18 @@ function PvPCard({ bet }: { bet: PvPBetWithRelations }) {
     : bet.pick === "AWAY_DRAW" ? `${bet.event.awayTeam} or Draw`
     : "Draw";
 
-  const joinerPick =
-    bet.pick === "HOME" ? bet.event.awayTeam
-    : bet.pick === "AWAY" ? bet.event.homeTeam
-    : bet.pick === "HOME_DRAW" ? bet.event.awayTeam
-    : bet.pick === "AWAY_DRAW" ? bet.event.homeTeam
-    : "Either team wins";
+  function resolvePickLabel(p: string) {
+    return p === "HOME" ? bet.event.homeTeam
+      : p === "AWAY" ? bet.event.awayTeam
+      : p === "HOME_DRAW" ? `${bet.event.homeTeam} or Draw`
+      : p === "AWAY_DRAW" ? `${bet.event.awayTeam} or Draw`
+      : "Draw";
+  }
+
+  const effectiveJoinerPick = bet.joinerPick
+    ?? (bet.pick === "HOME" ? "AWAY" : bet.pick === "AWAY" ? "HOME" : bet.pick === "HOME_DRAW" ? "AWAY" : bet.pick === "AWAY_DRAW" ? "HOME" : "HOME");
+  const joinerPick = resolvePickLabel(effectiveJoinerPick);
+  const effectiveJoinerAmount = bet.joinerAmount ?? Math.round(bet.amount * bet.odds);
 
   const statusLabel =
     bet.status === "WON_CREATOR" ? `${bet.creator.alias ?? bet.creator.name ?? "Creator"} won`
@@ -311,7 +319,8 @@ function PvPCard({ bet }: { bet: PvPBetWithRelations }) {
                 creatorPick={bet.pick}
                 amount={bet.amount}
                 currency={bet.currency}
-                odds={bet.odds}
+                joinerPick={effectiveJoinerPick}
+                joinerAmount={effectiveJoinerAmount}
               />
             </div>
           ) : bet.acceptor ? (
@@ -343,7 +352,7 @@ function PvPCard({ bet }: { bet: PvPBetWithRelations }) {
         <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5">
           <CoinAmount amount={bet.amount} currency={bet.currency} size={13} />
           <span className="text-text-muted">vs</span>
-          <CoinAmount amount={Math.round(bet.amount * bet.odds)} currency={bet.currency} size={13} />
+          <CoinAmount amount={effectiveJoinerAmount} currency={bet.currency} size={13} />
         </div>
         <span className="ml-auto font-medium uppercase tracking-wide text-[10px]" style={{ color: pvpStatusColor(bet.status) }}>
           {statusLabel}

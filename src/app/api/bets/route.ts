@@ -29,10 +29,27 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json();
-  const { eventId, pick, amount, odds, currency } = body;
+  const { eventId, pick, amount, joinerPick, joinerAmount, currency } = body;
 
-  if (!eventId || !pick || !amount || !odds) {
+  if (!eventId || !pick || !amount || !joinerPick || !joinerAmount) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
+  }
+
+  // Validate picks don't overlap
+  const PICK_OUTCOMES: Record<string, string[]> = {
+    HOME: ["HOME"], AWAY: ["AWAY"], DRAW: ["DRAW"],
+    HOME_DRAW: ["HOME", "DRAW"], AWAY_DRAW: ["AWAY", "DRAW"],
+  };
+  const creatorOutcomes = PICK_OUTCOMES[pick] ?? [];
+  const joinerOutcomes = PICK_OUTCOMES[joinerPick] ?? [];
+  if (creatorOutcomes.some((o: string) => joinerOutcomes.includes(o))) {
+    return NextResponse.json({ error: "Creator and joiner picks must not overlap" }, { status: 400 });
+  }
+
+  const parsedAmount = parseFloat(amount);
+  const parsedJoinerAmount = parseFloat(joinerAmount);
+  if (parsedAmount <= 0 || parsedJoinerAmount <= 0) {
+    return NextResponse.json({ error: "Stakes must be positive" }, { status: 400 });
   }
 
   const event = await prisma.event.findUnique({ where: { id: eventId } });
@@ -48,8 +65,10 @@ export async function POST(req: NextRequest) {
       creatorId: session.user.id,
       eventId,
       pick,
-      amount: parseFloat(amount),
-      odds: parseFloat(odds),
+      amount: parsedAmount,
+      odds: parsedJoinerAmount / parsedAmount,
+      joinerPick,
+      joinerAmount: parsedJoinerAmount,
       currency: currency || "GOLD",
     },
     include: {

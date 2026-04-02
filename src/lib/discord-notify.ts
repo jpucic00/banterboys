@@ -56,41 +56,76 @@ async function sendWebhook(payload: object): Promise<void> {
   }
 }
 
+function pickLabelForEvent(pick: string, homeTeam: string, awayTeam: string): string {
+  if (pick === "HOME") return homeTeam;
+  if (pick === "AWAY") return awayTeam;
+  if (pick === "DRAW") return "Draw";
+  if (pick === "HOME_DRAW") return `${homeTeam} or Draw`;
+  if (pick === "AWAY_DRAW") return `${awayTeam} or Draw`;
+  return pick;
+}
+
 export async function notifyBetCreated(bet: {
   creator: { name?: string | null; alias?: string | null };
   event: { homeTeam: string; awayTeam: string };
   pick: string;
   amount: number;
   odds: number;
+  joinerPick?: string | null;
+  joinerAmount?: number | null;
   currency: "GOLD" | "TIBIA_COINS";
 }): Promise<void> {
   const creator = displayName(bet.creator);
+  const hasNewStyle = bet.joinerPick && bet.joinerAmount != null;
+  const creatorPickLabel = pickLabelForEvent(bet.pick, bet.event.homeTeam, bet.event.awayTeam);
+
+  const fields = hasNewStyle
+    ? [
+        { name: "🧑 Challenger", value: creator, inline: true },
+        {
+          name: "🏟️ Event",
+          value: `${bet.event.homeTeam} vs ${bet.event.awayTeam}`,
+          inline: false,
+        },
+        {
+          name: "🎯 Creator bets on",
+          value: `${creatorPickLabel} — ${formatCurrency(bet.amount, bet.currency)}`,
+          inline: false,
+        },
+        {
+          name: "🎯 Joiner must bet on",
+          value: `${pickLabelForEvent(bet.joinerPick!, bet.event.homeTeam, bet.event.awayTeam)} — ${formatCurrency(bet.joinerAmount!, bet.currency)}`,
+          inline: false,
+        },
+      ]
+    : [
+        { name: "🧑 Challenger", value: creator, inline: true },
+        {
+          name: "🏟️ Event",
+          value: `${bet.event.homeTeam} vs ${bet.event.awayTeam}`,
+          inline: true,
+        },
+        { name: "🎯 Pick", value: bet.pick, inline: true },
+        {
+          name: "💰 Stake",
+          value: formatCurrency(bet.amount, bet.currency),
+          inline: true,
+        },
+        { name: "📈 Odds", value: `x${bet.odds.toFixed(2)}`, inline: true },
+        {
+          name: "💎 Joiner Commitment",
+          value: formatCurrency(Math.round(bet.amount * bet.odds), bet.currency),
+          inline: true,
+        },
+      ];
+
   await sendWebhook({
     embeds: [
       {
         title: "⚔️ New Bet Posted",
         description: `**${creator}** is looking for a challenger. Pick a side and step into the arena.${siteLink("join")}`,
         color: COLORS.orange,
-        fields: [
-          { name: "🧑 Challenger", value: creator, inline: true },
-          {
-            name: "🏟️ Event",
-            value: `${bet.event.homeTeam} vs ${bet.event.awayTeam}`,
-            inline: true,
-          },
-          { name: "🎯 Pick", value: bet.pick, inline: true },
-          {
-            name: "💰 Stake",
-            value: formatCurrency(bet.amount, bet.currency),
-            inline: true,
-          },
-          { name: "📈 Odds", value: `x${bet.odds.toFixed(2)}`, inline: true },
-          {
-            name: "💎 Joiner Commitment",
-            value: formatCurrency(Math.round(bet.amount * bet.odds), bet.currency),
-            inline: true,
-          },
-        ],
+        fields,
         footer: { text: "Banter Boys Betting" },
         timestamp: new Date().toISOString(),
       },
@@ -102,38 +137,65 @@ export async function notifyBetJoined(bet: {
   creator: { name?: string | null; alias?: string | null };
   acceptor: { name?: string | null; alias?: string | null } | null;
   event: { homeTeam: string; awayTeam: string };
+  pick: string;
   amount: number;
   odds: number;
+  joinerPick?: string | null;
+  joinerAmount?: number | null;
   currency: "GOLD" | "TIBIA_COINS";
 }): Promise<void> {
   const creator = displayName(bet.creator);
   const acceptor = bet.acceptor ? displayName(bet.acceptor) : "Unknown";
+  const hasNewStyle = bet.joinerPick && bet.joinerAmount != null;
+
+  const fields = hasNewStyle
+    ? [
+        { name: "⚔️ Challenger", value: creator, inline: true },
+        { name: "🛡️ Acceptor", value: acceptor, inline: true },
+        {
+          name: "🏟️ Event",
+          value: `${bet.event.homeTeam} vs ${bet.event.awayTeam}`,
+          inline: false,
+        },
+        {
+          name: "🎯 " + creator,
+          value: `${pickLabelForEvent(bet.pick, bet.event.homeTeam, bet.event.awayTeam)} — ${formatCurrency(bet.amount, bet.currency)}`,
+          inline: true,
+        },
+        {
+          name: "🎯 " + acceptor,
+          value: `${pickLabelForEvent(bet.joinerPick!, bet.event.homeTeam, bet.event.awayTeam)} — ${formatCurrency(bet.joinerAmount!, bet.currency)}`,
+          inline: true,
+        },
+      ]
+    : [
+        { name: "⚔️ Challenger", value: creator, inline: true },
+        { name: "🛡️ Acceptor", value: acceptor, inline: true },
+        {
+          name: "🏟️ Event",
+          value: `${bet.event.homeTeam} vs ${bet.event.awayTeam}`,
+          inline: false,
+        },
+        {
+          name: "💰 Creator Staked",
+          value: formatCurrency(bet.amount, bet.currency),
+          inline: true,
+        },
+        {
+          name: "💎 Joiner Committed",
+          value: formatCurrency(Math.round(bet.amount * bet.odds), bet.currency),
+          inline: true,
+        },
+        { name: "📈 Odds", value: `x${bet.odds.toFixed(2)}`, inline: true },
+      ];
+
   await sendWebhook({
     embeds: [
       {
         title: "🤝 Bet Accepted — It's On!",
         description: `**${acceptor}** has accepted **${creator}**'s challenge. May the better adventurer win.${siteLink("view")}`,
         color: COLORS.blue,
-        fields: [
-          { name: "⚔️ Challenger", value: creator, inline: true },
-          { name: "🛡️ Acceptor", value: acceptor, inline: true },
-          {
-            name: "🏟️ Event",
-            value: `${bet.event.homeTeam} vs ${bet.event.awayTeam}`,
-            inline: false,
-          },
-          {
-            name: "💰 Creator Staked",
-            value: formatCurrency(bet.amount, bet.currency),
-            inline: true,
-          },
-          {
-            name: "💎 Joiner Committed",
-            value: formatCurrency(Math.round(bet.amount * bet.odds), bet.currency),
-            inline: true,
-          },
-          { name: "📈 Odds", value: `x${bet.odds.toFixed(2)}`, inline: true },
-        ],
+        fields,
         footer: { text: "Banter Boys Betting" },
         timestamp: new Date().toISOString(),
       },
@@ -187,13 +249,17 @@ export async function notifyBetSettled(
     pick: string;
     amount: number;
     odds: number;
+    joinerPick?: string | null;
+    joinerAmount?: number | null;
     currency: "GOLD" | "TIBIA_COINS";
   },
   creatorWon: boolean
 ): Promise<void> {
   const winner = creatorWon ? bet.creator : (bet.acceptor ?? bet.creator);
   const loser = creatorWon ? (bet.acceptor ?? bet.creator) : bet.creator;
-  const payout = bet.amount * bet.odds;
+  const payout = bet.joinerAmount != null
+    ? (creatorWon ? bet.joinerAmount : bet.amount)
+    : bet.amount * bet.odds;
   const score =
     bet.event.homeScore !== null && bet.event.awayScore !== null
       ? ` (${bet.event.homeScore}-${bet.event.awayScore})`
@@ -225,6 +291,48 @@ export async function notifyBetSettled(
             name: "💰 Payout",
             value: formatCurrency(Math.round(payout), bet.currency),
             inline: true,
+          },
+        ],
+        footer: { text: "Banter Boys Betting" },
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  });
+}
+
+export async function notifyBetVoided(bet: {
+  creator: { name?: string | null; alias?: string | null };
+  acceptor: { name?: string | null; alias?: string | null } | null;
+  event: {
+    homeTeam: string;
+    awayTeam: string;
+    homeScore: number | null;
+    awayScore: number | null;
+  };
+  pick: string;
+  joinerPick?: string | null;
+  currency: "GOLD" | "TIBIA_COINS";
+}): Promise<void> {
+  const creator = displayName(bet.creator);
+  const acceptor = bet.acceptor ? displayName(bet.acceptor) : "Unknown";
+  const score =
+    bet.event.homeScore !== null && bet.event.awayScore !== null
+      ? ` (${bet.event.homeScore}-${bet.event.awayScore})`
+      : "";
+
+  await sendWebhook({
+    embeds: [
+      {
+        title: "⚖️ Bet Voided — No Winner",
+        description: `Neither **${creator}** nor **${acceptor}** called it right. No gold changes hands.${siteLink("view")}`,
+        color: COLORS.orange,
+        fields: [
+          { name: "⚔️ Challenger", value: creator, inline: true },
+          { name: "🛡️ Acceptor", value: acceptor, inline: true },
+          {
+            name: "🏟️ Event",
+            value: `${bet.event.homeTeam} vs ${bet.event.awayTeam}${score}`,
+            inline: false,
           },
         ],
         footer: { text: "Banter Boys Betting" },

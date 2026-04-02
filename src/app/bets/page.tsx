@@ -186,8 +186,9 @@ function CreateBetModal({
   const [selectedSportId, setSelectedSportId] = useState("");
   const [selectedEventId, setSelectedEventId] = useState("");
   const [selectedPick, setSelectedPick] = useState<"HOME" | "AWAY" | "DRAW" | "HOME_DRAW" | "AWAY_DRAW" | "">("");
+  const [joinerPick, setJoinerPick] = useState<"HOME" | "AWAY" | "DRAW" | "HOME_DRAW" | "AWAY_DRAW" | "">("");
   const [amount, setAmount] = useState("");
-  const [odds, setOdds] = useState("2.00");
+  const [joinerAmount, setJoinerAmount] = useState("");
   const [currency, setCurrency] = useState<"GOLD" | "TIBIA_COINS">("GOLD");
   const [submitting, setSubmitting] = useState(false);
   const [matchSearch, setMatchSearch] = useState("");
@@ -215,7 +216,7 @@ function CreateBetModal({
     1: "Sport & League",
     2: "Select Match",
     3: "Your Pick",
-    4: "Stake & Odds",
+    4: "Stakes & Opponent",
     5: "Review",
   };
   const stepLabel = STEP_LABELS[step] ?? "";
@@ -253,25 +254,49 @@ function CreateBetModal({
 
   function selectPick(pick: "HOME" | "AWAY" | "DRAW" | "HOME_DRAW" | "AWAY_DRAW") {
     setSelectedPick(pick);
+    setJoinerPick("");
     setStep(STEP.stake);
   }
+
+  const PICK_OUTCOMES: Record<string, string[]> = {
+    HOME: ["HOME"], AWAY: ["AWAY"], DRAW: ["DRAW"],
+    HOME_DRAW: ["HOME", "DRAW"], AWAY_DRAW: ["AWAY", "DRAW"],
+  };
+
+  function picksOverlap(a: string, b: string): boolean {
+    const ao = PICK_OUTCOMES[a] ?? [];
+    const bo = PICK_OUTCOMES[b] ?? [];
+    return ao.some((o) => bo.includes(o));
+  }
+
+  const availableJoinerPicks = useMemo(() => {
+    if (!selectedPick || !selectedEvent) return [];
+    const allPicks: ("HOME" | "AWAY" | "DRAW" | "HOME_DRAW" | "AWAY_DRAW")[] = ["HOME", "AWAY", "DRAW", "HOME_DRAW", "AWAY_DRAW"];
+    const hasDoubleChance = !!selectedEvent.odds[0]?.homeDrawOdds && !!selectedEvent.odds[0]?.awayDrawOdds;
+    return allPicks.filter((p) => {
+      if (p === selectedPick) return false;
+      if (!hasDrawOdds && (p === "DRAW" || p === "HOME_DRAW" || p === "AWAY_DRAW")) return false;
+      if (!hasDoubleChance && (p === "HOME_DRAW" || p === "AWAY_DRAW")) return false;
+      return !picksOverlap(selectedPick, p);
+    });
+  }, [selectedPick, selectedEvent, hasDrawOdds]);
 
   function goBack() {
     if (step === STEP.sportLeague) return;
     if (step === STEP.match) { setSelectedSportId(""); setSelectedType(""); setStep(STEP.sportLeague); }
     else if (step === STEP.pick) { setSelectedEventId(""); setStep(STEP.match); }
-    else if (step === STEP.stake) { setSelectedPick(""); setStep(STEP.pick); }
+    else if (step === STEP.stake) { setSelectedPick(""); setJoinerPick(""); setJoinerAmount(""); setStep(STEP.pick); }
     else if (step === STEP.review) { setStep(STEP.stake); }
   }
 
   async function handleSubmit() {
-    if (!selectedEventId || !selectedPick || !amount || !odds) return;
+    if (!selectedEventId || !selectedPick || !amount || !joinerPick || !joinerAmount) return;
     setSubmitting(true);
     try {
       const res = await fetch("/api/bets", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ eventId: selectedEventId, pick: selectedPick, amount, odds, currency }),
+        body: JSON.stringify({ eventId: selectedEventId, pick: selectedPick, amount, joinerPick, joinerAmount, currency }),
       });
       if (res.ok) onSuccess();
     } finally {
@@ -279,13 +304,17 @@ function CreateBetModal({
     }
   }
 
-  const pickLabel =
-    selectedPick === "HOME" ? selectedEvent?.homeTeam
-    : selectedPick === "AWAY" ? selectedEvent?.awayTeam
-    : selectedPick === "DRAW" ? "Draw"
-    : selectedPick === "HOME_DRAW" ? `${selectedEvent?.homeTeam} or Draw`
-    : selectedPick === "AWAY_DRAW" ? `${selectedEvent?.awayTeam} or Draw`
-    : "";
+  function resolvePickLabel(pick: string) {
+    return pick === "HOME" ? selectedEvent?.homeTeam
+      : pick === "AWAY" ? selectedEvent?.awayTeam
+      : pick === "DRAW" ? "Draw"
+      : pick === "HOME_DRAW" ? `${selectedEvent?.homeTeam} or Draw`
+      : pick === "AWAY_DRAW" ? `${selectedEvent?.awayTeam} or Draw`
+      : "";
+  }
+
+  const pickLabel = resolvePickLabel(selectedPick);
+  const joinerPickLabelText = resolvePickLabel(joinerPick);
 
   const displayStep = step;
 
@@ -525,7 +554,7 @@ function CreateBetModal({
           })()}
 
           {/* Stake step */}
-          {step === STEP.stake && (
+          {step === STEP.stake && selectedEvent && (
             <div>
               {/* Currency */}
               <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
@@ -553,54 +582,83 @@ function CreateBetModal({
                 ))}
               </div>
 
-              {/* Amount + Odds */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 16 }}>
-                <div>
-                  <label style={{ display: "block", fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>
-                    Your Stake
-                  </label>
-                  <input
-                    type="number"
-                    value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    min="1"
-                    autoFocus
-                    placeholder="e.g. 100,000"
-                    style={{
-                      width: "100%", padding: "8px 10px", borderRadius: 6, fontSize: 13,
-                      background: "#1a1a1a", border: "1px solid #2a2a2a", color: "#fff",
-                      outline: "none", boxSizing: "border-box",
-                    }}
-                  />
+              {/* Your Stake */}
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: "block", fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>
+                  Your Stake
+                </label>
+                <input
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  min="1"
+                  autoFocus
+                  placeholder="e.g. 100,000"
+                  style={{
+                    width: "100%", padding: "8px 10px", borderRadius: 6, fontSize: 13,
+                    background: "#1a1a1a", border: "1px solid #2a2a2a", color: "#fff",
+                    outline: "none", boxSizing: "border-box",
+                  }}
+                />
+              </div>
+
+              {/* Joiner's Pick */}
+              <div style={{ marginBottom: 14 }}>
+                <label style={{ display: "block", fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>
+                  Joiner must bet on
+                </label>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {availableJoinerPicks.map((p) => {
+                    const label = resolvePickLabel(p);
+                    const active = joinerPick === p;
+                    return (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => setJoinerPick(p)}
+                        style={{
+                          padding: "7px 14px", borderRadius: 6, fontSize: 12, fontWeight: 600,
+                          background: active ? "#2a2a2a" : "#1a1a1a",
+                          border: active ? "1px solid #00c853" : "1px solid #2a2a2a",
+                          color: active ? "#00c853" : "#888",
+                          cursor: "pointer",
+                        }}
+                      >
+                        {label}
+                      </button>
+                    );
+                  })}
                 </div>
-                <div>
-                  <label style={{ display: "block", fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>
-                    Odds
-                    <span style={{ color: "#444", textTransform: "none", marginLeft: 4 }}>(1:1 = 2.00)</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={odds}
-                    onChange={(e) => setOdds(e.target.value)}
-                    min="1.01" step="0.01"
-                    style={{
-                      width: "100%", padding: "8px 10px", borderRadius: 6, fontSize: 13,
-                      background: "#1a1a1a", border: "1px solid #2a2a2a", color: "#fff",
-                      outline: "none", boxSizing: "border-box",
-                    }}
-                  />
-                </div>
+              </div>
+
+              {/* Joiner's Stake */}
+              <div style={{ marginBottom: 16 }}>
+                <label style={{ display: "block", fontSize: 10, color: "#555", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 6 }}>
+                  Joiner&apos;s Stake
+                </label>
+                <input
+                  type="number"
+                  value={joinerAmount}
+                  onChange={(e) => setJoinerAmount(e.target.value)}
+                  min="1"
+                  placeholder="e.g. 100,000"
+                  style={{
+                    width: "100%", padding: "8px 10px", borderRadius: 6, fontSize: 13,
+                    background: "#1a1a1a", border: "1px solid #2a2a2a", color: "#fff",
+                    outline: "none", boxSizing: "border-box",
+                  }}
+                />
               </div>
 
               <button
                 type="button"
-                disabled={!amount || !odds}
+                disabled={!amount || !joinerPick || !joinerAmount}
                 onClick={() => setStep(STEP.review)}
                 style={{
                   width: "100%", padding: "10px 0", borderRadius: 6, fontSize: 13,
                   fontWeight: 700, color: "#fff", background: "#C62828", border: "none",
-                  cursor: !amount || !odds ? "not-allowed" : "pointer",
-                  opacity: !amount || !odds ? 0.4 : 1,
+                  cursor: !amount || !joinerPick || !joinerAmount ? "not-allowed" : "pointer",
+                  opacity: !amount || !joinerPick || !joinerAmount ? 0.4 : 1,
                 }}
               >
                 Review Bet →
@@ -612,9 +670,7 @@ function CreateBetModal({
           {step === STEP.review && selectedEvent && (() => {
             const cur = currency === "GOLD" ? "Gold" : "TC";
             const stake = Number(amount);
-            const oddsNum = Number(odds);
-            const joinerPays = Math.round(stake * oddsNum);
-            const youWin = Math.round(stake * oddsNum);
+            const joinerStake = Number(joinerAmount);
             return (
               <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
 
@@ -631,23 +687,6 @@ function CreateBetModal({
                     desc="The event you are betting on"
                     value={`${selectedEvent.homeTeam} vs ${selectedEvent.awayTeam}`}
                     valueColor="#fff"
-                    last
-                  />
-                </div>
-
-                {/* Pick + kick-off block */}
-                <div style={{ background: "#1a1a1a", border: "1px solid #252525", borderRadius: 6, overflow: "hidden" }}>
-                  <ReviewRow
-                    label="Your pick"
-                    desc="You are backing this outcome — the joiner takes the opposite side"
-                    value={pickLabel ?? ""}
-                    valueColor="#F0A818"
-                  />
-                  <ReviewRow
-                    label="Odds"
-                    desc={oddsNum === 2 ? "Equal stakes — both sides risk the same amount" : "Asymmetric — adjust so the joiner agrees the risk is fair"}
-                    value={`${oddsNum.toFixed(2)}x`}
-                    valueColor="#60a5fa"
                   />
                   <ReviewRow
                     label="Kick-off"
@@ -658,31 +697,42 @@ function CreateBetModal({
                   />
                 </div>
 
+                {/* Picks block */}
+                <div style={{ background: "#1a1a1a", border: "1px solid #252525", borderRadius: 6, overflow: "hidden" }}>
+                  <ReviewRow
+                    label="You bet on"
+                    desc={`Your stake: ${stake.toLocaleString()} ${cur}`}
+                    value={pickLabel ?? ""}
+                    valueColor="#F0A818"
+                  />
+                  <ReviewRow
+                    label="Joiner bets on"
+                    desc={`Joiner's stake: ${joinerStake.toLocaleString()} ${cur}`}
+                    value={joinerPickLabelText ?? ""}
+                    valueColor="#00c853"
+                    last
+                  />
+                </div>
+
                 {/* Financial block */}
                 <div style={{ background: "#1a1a1a", border: "1px solid #252525", borderRadius: 6, overflow: "hidden" }}>
                   <ReviewRow
-                    label="Your commitment"
-                    desc="You are challenging anyone in the guild to take the other side of this bet for this amount"
-                    value={`${stake.toLocaleString()} ${cur}`}
-                    valueColor="#ccc"
-                  />
-                  <ReviewRow
-                    label="Joiner's commitment"
-                    desc="The player that accepts this bet agrees to pay this amount if they lose — no money changes hands upfront"
-                    value={`${joinerPays.toLocaleString()} ${cur}`}
-                    valueColor="#ccc"
-                  />
-                  <ReviewRow
                     label="If you win"
-                    desc="The joiner pays you this amount after the match settles"
-                    value={`+${joinerPays.toLocaleString()} ${cur} from joiner`}
+                    desc="The joiner pays you their stake after the match settles"
+                    value={`+${joinerStake.toLocaleString()} ${cur} from joiner`}
                     valueColor="#00c853"
                   />
                   <ReviewRow
                     label="If you lose"
-                    desc="You pay the joiner this amount after the match settles"
+                    desc="You pay the joiner your stake after the match settles"
                     value={`−${stake.toLocaleString()} ${cur} to joiner`}
                     valueColor="#ef4444"
+                  />
+                  <ReviewRow
+                    label="If neither wins"
+                    desc="E.g. a draw when neither side picked draw"
+                    value="Void — no payout"
+                    valueColor="#888"
                     last
                   />
                 </div>

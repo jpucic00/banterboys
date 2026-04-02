@@ -56,6 +56,8 @@ interface BetCardProps {
     pick: string;
     amount: number;
     odds: number;
+    joinerPick?: string | null;
+    joinerAmount?: number | null;
     currency: string;
     status: string;
     createdAt: string;
@@ -107,12 +109,18 @@ export default function BetCard({ bet, onJoin, onCancel }: BetCardProps) {
     : bet.pick === "AWAY_DRAW" ? `${bet.event.awayTeam} or Draw`
     : "Draw";
 
-  const joinerPickLabel =
-    bet.pick === "HOME" ? bet.event.awayTeam
-    : bet.pick === "AWAY" ? bet.event.homeTeam
-    : bet.pick === "HOME_DRAW" ? bet.event.awayTeam
-    : bet.pick === "AWAY_DRAW" ? bet.event.homeTeam
-    : "Either team wins";
+  function resolvePickLabel(pick: string) {
+    return pick === "HOME" ? bet.event.homeTeam
+      : pick === "AWAY" ? bet.event.awayTeam
+      : pick === "HOME_DRAW" ? `${bet.event.homeTeam} or Draw`
+      : pick === "AWAY_DRAW" ? `${bet.event.awayTeam} or Draw`
+      : "Draw";
+  }
+
+  const effectiveJoinerPick = bet.joinerPick
+    ?? (bet.pick === "HOME" ? "AWAY" : bet.pick === "AWAY" ? "HOME" : bet.pick === "HOME_DRAW" ? "AWAY" : bet.pick === "AWAY_DRAW" ? "HOME" : "HOME");
+  const joinerPickLabel = resolvePickLabel(effectiveJoinerPick);
+  const effectiveJoinerAmount = bet.joinerAmount ?? Math.round(bet.amount * bet.odds);
 
   const borderColor =
     bet.status === "WON_CREATOR" || bet.status === "WON_ACCEPTOR"
@@ -216,7 +224,8 @@ export default function BetCard({ bet, onJoin, onCancel }: BetCardProps) {
                 creatorPick={bet.pick}
                 amount={bet.amount}
                 currency={bet.currency}
-                odds={bet.odds}
+                joinerPick={effectiveJoinerPick}
+                joinerAmount={effectiveJoinerAmount}
               />
             </div>
           ) : bet.acceptor ? (
@@ -254,7 +263,7 @@ export default function BetCard({ bet, onJoin, onCancel }: BetCardProps) {
         <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-1.5">
           <CoinAmount amount={bet.amount} currency={bet.currency} size={13} />
           <span className="text-text-muted">vs</span>
-          <CoinAmount amount={Math.round(bet.amount * bet.odds)} currency={bet.currency} size={13} />
+          <CoinAmount amount={effectiveJoinerAmount} currency={bet.currency} size={13} />
         </div>
         <div className="ml-auto flex items-center gap-2">
           {canCancel && (

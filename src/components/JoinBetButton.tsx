@@ -13,10 +13,11 @@ interface JoinBetButtonProps {
   matchLabel: string;
   homeTeam: string;
   awayTeam: string;
-  creatorPick: string; // raw "HOME" | "AWAY" | "DRAW"
+  creatorPick: string;
   amount: number;
   currency: string;
-  odds: number;
+  joinerPick: string;
+  joinerAmount: number;
 }
 
 export default function JoinBetButton({
@@ -28,7 +29,8 @@ export default function JoinBetButton({
   creatorPick,
   amount,
   currency,
-  odds,
+  joinerPick,
+  joinerAmount,
 }: JoinBetButtonProps) {
   const { data: session } = useSession();
   const router = useRouter();
@@ -82,24 +84,20 @@ export default function JoinBetButton({
   const coinSrc = currency === "TIBIA_COINS" ? "/tibia/tibia_coin.webp" : "/tibia/crystal_coin.webp";
   const fmt = (n: number) => currency === "TIBIA_COINS" ? `${n.toLocaleString()} TC` : formatGold(n);
 
-  // Labels
-  const openerPickLabel =
-    creatorPick === "HOME" ? homeTeam
-    : creatorPick === "AWAY" ? awayTeam
-    : creatorPick === "HOME_DRAW" ? `${homeTeam} or Draw`
-    : creatorPick === "AWAY_DRAW" ? `${awayTeam} or Draw`
-    : "Draw";
+  function resolvePickLabel(pick: string) {
+    return pick === "HOME" ? homeTeam
+      : pick === "AWAY" ? awayTeam
+      : pick === "HOME_DRAW" ? `${homeTeam} or Draw`
+      : pick === "AWAY_DRAW" ? `${awayTeam} or Draw`
+      : "Draw";
+  }
 
-  const joinerPickLabel =
-    creatorPick === "HOME" ? awayTeam
-    : creatorPick === "AWAY" ? homeTeam
-    : creatorPick === "HOME_DRAW" ? awayTeam
-    : creatorPick === "AWAY_DRAW" ? homeTeam
-    : "Either team wins";
+  const openerPickLabel = resolvePickLabel(creatorPick);
+  const joinerPickLabel = resolvePickLabel(joinerPick);
 
   // Financials from joiner's perspective
-  const joinerCommitment = Math.round(amount * odds); // what joiner owes if they lose
-  const joinerWins = amount;                           // what joiner receives if opener loses
+  const joinerCommitment = joinerAmount;  // what joiner owes if they lose
+  const joinerWins = amount;              // what joiner receives if opener loses
 
   const modal = showConfirm && createPortal(
     <>

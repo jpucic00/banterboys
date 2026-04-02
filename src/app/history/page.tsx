@@ -47,9 +47,10 @@ export default async function HistoryPage() {
                 <th className="pb-2 pr-4">Match</th>
                 <th className="pb-2 pr-4">Creator</th>
                 <th className="pb-2 pr-4">Acceptor</th>
-                <th className="pb-2 pr-4">Pick</th>
-                <th className="pb-2 pr-4">Amount</th>
-                <th className="pb-2 pr-4">Odds</th>
+                <th className="pb-2 pr-4">Creator Pick</th>
+                <th className="pb-2 pr-4">Creator Stake</th>
+                <th className="pb-2 pr-4">Joiner Pick</th>
+                <th className="pb-2 pr-4">Joiner Stake</th>
                 <th className="pb-2">Result</th>
               </tr>
             </thead>
@@ -75,8 +76,18 @@ export default async function HistoryPage() {
                   <td className="py-3 pr-4 text-text-primary">
                     <CoinAmount amount={bet.amount} currency={bet.currency} />
                   </td>
-                  <td className="py-3 pr-4 text-tibia-green">
-                    {bet.odds.toFixed(2)}
+                  <td className="py-3 pr-4 text-gold">
+                    {(() => {
+                      const jp = bet.joinerPick ?? (bet.pick === "HOME" ? "AWAY" : bet.pick === "AWAY" ? "HOME" : bet.pick === "HOME_DRAW" ? "AWAY" : bet.pick === "AWAY_DRAW" ? "HOME" : "HOME");
+                      return jp === "HOME" ? bet.event.homeTeam
+                        : jp === "AWAY" ? bet.event.awayTeam
+                        : jp === "HOME_DRAW" ? `${bet.event.homeTeam} or Draw`
+                        : jp === "AWAY_DRAW" ? `${bet.event.awayTeam} or Draw`
+                        : "Draw";
+                    })()}
+                  </td>
+                  <td className="py-3 pr-4 text-text-primary">
+                    <CoinAmount amount={bet.joinerAmount ?? Math.round(bet.amount * bet.odds)} currency={bet.currency} />
                   </td>
                   <td
                     className={`py-3 font-medium ${
