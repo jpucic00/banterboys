@@ -5,11 +5,12 @@ import { CoinAmount } from "@/components/CoinIcon";
 import JoinBetButton from "@/components/JoinBetButton";
 import OverviewFilterButtons from "@/components/OverviewFilterButtons";
 import { Suspense } from "react";
+import { PvPBetStatus, TicketStatus } from "@prisma/client";
 
 export const dynamic = "force-dynamic";
 
-const ACTIVE_PVP_STATUSES = ["OPEN", "MATCHED"];
-const ACTIVE_TICKET_STATUSES = ["PENDING"];
+const ACTIVE_PVP_STATUSES: PvPBetStatus[] = ["OPEN", "MATCHED"];
+const ACTIVE_TICKET_STATUSES: TicketStatus[] = ["PENDING"];
 
 export default async function Home({
   searchParams,
