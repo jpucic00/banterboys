@@ -92,6 +92,9 @@ export async function settleTicketSelections(eventId: string) {
   // Settle tickets: bust immediately on first loss, otherwise wait for all picks
   const ticketIds = [...new Set(selections.map((s) => s.ticketId))];
   for (const ticketId of ticketIds) {
+    const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
+    if (!ticket || ticket.status !== "PENDING") continue;
+
     const allSelections = await prisma.ticketSelection.findMany({
       where: { ticketId },
     });
