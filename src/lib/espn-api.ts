@@ -32,6 +32,7 @@ export interface EspnEvent {
   inProgress: boolean;
   eventDate: Date;
   wentToExtraTime: boolean;
+  statusDetail?: string; // e.g. "45:00 - 1st Half", "HT", "Q3 4:23", "Final"
 }
 
 interface EspnCompetitor {
@@ -57,7 +58,7 @@ interface EspnCompetition {
   id: string;
   date?: string;
   competitors: EspnCompetitor[];
-  status: { type: { completed: boolean; state: "pre" | "in" | "post"; name?: string } };
+  status: { type: { completed: boolean; state: "pre" | "in" | "post"; name?: string; shortDetail?: string } };
 }
 
 interface EspnRawEvent {
@@ -102,6 +103,7 @@ function parseEspnEvents(data: EspnScoreboardResponse, sportKey: string): EspnEv
         inProgress: comp.status.type.state === "in",
         eventDate: new Date(comp.date ?? event.date),
         wentToExtraTime: isSoccerSport(sportKey) && EXTRA_TIME_STATUSES.has(comp.status.type.name ?? ""),
+        statusDetail: comp.status.type.shortDetail,
       });
 
       // For single-competition events, only process the first competition.

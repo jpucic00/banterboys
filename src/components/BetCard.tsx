@@ -67,6 +67,12 @@ interface BetCardProps {
       homeTeam: string;
       awayTeam: string;
       commenceTime: string;
+      status: string;
+      homeScore: number | null;
+      awayScore: number | null;
+      liveHomeScore: number | null;
+      liveAwayScore: number | null;
+      liveClock: string | null;
       sport: { name: string; key: string };
     };
   };
@@ -253,9 +259,31 @@ export default function BetCard({ bet, onJoin, onCancel }: BetCardProps) {
         <div className="text-xs text-text-secondary">
           {bet.event.homeTeam} <span className="text-text-muted">vs</span> {bet.event.awayTeam}
         </div>
-        <div className="text-[11px] text-text-muted mt-0.5">
-          {formatCET(bet.event.commenceTime)}
-        </div>
+        {bet.event.status === "LIVE" ? (
+          <div className="flex items-center gap-1.5 text-[11px] mt-0.5 flex-wrap">
+            <span className="flex items-center gap-1 font-bold" style={{ color: "#ef4444" }}>
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
+              LIVE
+            </span>
+            <span className="font-bold text-white">
+              {bet.event.liveHomeScore ?? 0} – {bet.event.liveAwayScore ?? 0}
+            </span>
+            {bet.event.liveClock && (
+              <span className="text-text-muted">{bet.event.liveClock}</span>
+            )}
+          </div>
+        ) : bet.event.status === "COMPLETED" && bet.event.homeScore !== null && bet.event.awayScore !== null ? (
+          <div className="flex items-center gap-1.5 text-[11px] mt-0.5">
+            <span className="text-text-muted">FT</span>
+            <span className="font-bold text-text-secondary">
+              {bet.event.homeScore} – {bet.event.awayScore}
+            </span>
+          </div>
+        ) : (
+          <div className="text-[11px] text-text-muted mt-0.5">
+            {formatCET(bet.event.commenceTime)}
+          </div>
+        )}
       </div>
 
       {/* Footer */}

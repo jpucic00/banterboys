@@ -89,33 +89,38 @@ export async function settleTicketSelections(eventId: string) {
     });
   }
 
-  // Check if any tickets can be fully settled
+  // Settle tickets: bust immediately on first loss, otherwise wait for all picks
   const ticketIds = [...new Set(selections.map((s) => s.ticketId))];
   for (const ticketId of ticketIds) {
     const allSelections = await prisma.ticketSelection.findMany({
       where: { ticketId },
     });
 
-    const allResolved = allSelections.every(
-      (s) => s.result !== SelectionResult.PENDING
-    );
+    const anyLost = allSelections.some((s) => s.result === SelectionResult.LOST);
+
+    // Bust immediately if any pick lost — no need to wait for remaining picks
+    if (anyLost) {
+      await prisma.ticket.update({
+        where: { id: ticketId },
+        data: { status: "LOST", settledAt: new Date() },
+      });
+      const settled = await prisma.ticket.findUnique({
+        where: { id: ticketId },
+        include: {
+          user: { select: { name: true, alias: true } },
+          selections: { include: { event: true } },
+        },
+      });
+      if (settled) notifyTicketSettled(settled, "LOST").catch(() => {});
+      continue;
+    }
+
+    // Otherwise only settle when all picks are resolved
+    const allResolved = allSelections.every((s) => s.result !== SelectionResult.PENDING);
     if (!allResolved) continue;
 
-    const anyLost = allSelections.some(
-      (s) => s.result === SelectionResult.LOST
-    );
-    const anyVoid = allSelections.some(
-      (s) => s.result === SelectionResult.VOID
-    );
-
-    let status: "WON" | "LOST" | "VOID";
-    if (anyLost) {
-      status = "LOST";
-    } else if (anyVoid && allSelections.every((s) => s.result === SelectionResult.VOID)) {
-      status = "VOID";
-    } else {
-      status = "WON";
-    }
+    const allVoid = allSelections.every((s) => s.result === SelectionResult.VOID);
+    const status = allVoid ? "VOID" : "WON";
 
     await prisma.ticket.update({
       where: { id: ticketId },

@@ -413,27 +413,54 @@ export async function notifyTicketSettled(
     selections: Array<{
       pick: string;
       result: string;
-      event: { homeTeam: string; awayTeam: string };
+      event: {
+        homeTeam: string;
+        awayTeam: string;
+        homeScore: number | null;
+        awayScore: number | null;
+      };
     }>;
   },
   status: "WON" | "LOST"
 ): Promise<void> {
   const won = status === "WON";
-  const wonCount = ticket.selections.filter((s) => s.result === "WON").length;
-  const total = ticket.selections.length;
   const userName = displayName(ticket.user);
-  const currencyLabel =
-    ticket.currency === "TIBIA_COINS" ? "Tibia Coins" : "Gold";
+  const currencyLabel = ticket.currency === "TIBIA_COINS" ? "Tibia Coins" : "Gold";
 
   let description: string;
+  let fields: object[];
+
   if (won) {
-    description = `**${userName}** went ${wonCount}/${total} and cashed out. Every leg landed — a perfect bet slip.`;
-  } else if (wonCount === 0) {
-    description = `**${userName}** went 0/${total}. Not a single leg survived. The Amulet of Loss weeps.`;
+    const total = ticket.selections.length;
+    description = `**${userName}** hit all ${total} leg${total > 1 ? "s" : ""} and cashed out. A perfect bet slip.${siteLink("slip")}`;
+    fields = [
+      { name: "🧑 Player", value: userName, inline: true },
+      { name: "🔗 Legs", value: String(total), inline: true },
+      { name: "💰 Stake", value: formatCurrency(ticket.amount, ticket.currency), inline: true },
+      { name: "💎 Payout", value: formatCurrency(Math.round(ticket.potentialPayout), ticket.currency), inline: true },
+    ];
   } else {
-    description = `**${userName}** went ${wonCount}/${total}. The slip is broken — no payout today.`;
+    const bustSel = ticket.selections.find((s) => s.result === "LOST");
+    const bustMatch = bustSel
+      ? `${bustSel.event.homeTeam} vs ${bustSel.event.awayTeam}`
+      : "Unknown match";
+    const bustScore =
+      bustSel && bustSel.event.homeScore !== null && bustSel.event.awayScore !== null
+        ? ` (${bustSel.event.homeScore}–${bustSel.event.awayScore})`
+        : "";
+    const bustPick = bustSel ? pickLabelForEvent(bustSel.pick, bustSel.event.homeTeam, bustSel.event.awayTeam) : "";
+
+    description = `**${userName}**'s slip is dead. The Amulet of Loss weeps.${siteLink("slip")}`;
+    fields = [
+      { name: "🧑 Player", value: userName, inline: true },
+      { name: "💰 Stake Lost", value: `0 ${currencyLabel}`, inline: true },
+      {
+        name: "💀 Busted by",
+        value: `${bustMatch}${bustScore}\nPick: **${bustPick}**`,
+        inline: false,
+      },
+    ];
   }
-  description += siteLink("slip");
 
   await sendWebhook({
     embeds: [
@@ -441,29 +468,7 @@ export async function notifyTicketSettled(
         title: won ? "🎉 Bet Slip Hit — Winner!" : "💀 Bet Slip Busted",
         description,
         color: won ? COLORS.green : COLORS.red,
-        fields: [
-          { name: "🧑 Player", value: userName, inline: true },
-          {
-            name: won ? "✅ Legs Correct" : "❌ Legs Correct",
-            value: `${wonCount}/${total}`,
-            inline: true,
-          },
-          {
-            name: "💰 Stake",
-            value: formatCurrency(ticket.amount, ticket.currency),
-            inline: true,
-          },
-          {
-            name: won ? "💎 Payout" : "💸 Payout",
-            value: won
-              ? formatCurrency(
-                  Math.round(ticket.potentialPayout),
-                  ticket.currency
-                )
-              : `0 ${currencyLabel}`,
-            inline: true,
-          },
-        ],
+        fields,
         footer: { text: "Banter Boys Betting" },
         timestamp: new Date().toISOString(),
       },

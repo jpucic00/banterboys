@@ -123,11 +123,14 @@ model Event {
   homeTeam     String
   awayTeam     String
   commenceTime DateTime
-  homeScore    Int?
-  awayScore    Int?
-  status       EventStatus @default(UPCOMING)
-  completedAt  DateTime?
-  espnEventId  String?     @unique
+  homeScore     Int?
+  awayScore     Int?
+  liveHomeScore Int?
+  liveAwayScore Int?
+  liveClock     String?
+  status        EventStatus @default(UPCOMING)
+  completedAt   DateTime?
+  espnEventId   String?     @unique
   updatedAt    DateTime    @updatedAt
 
   sport      Sport           @relation(fields: [sportId], references: [id])

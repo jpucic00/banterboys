@@ -18,6 +18,12 @@ interface Event {
   homeTeam: string;
   awayTeam: string;
   commenceTime: string;
+  status: string;
+  homeScore: number | null;
+  awayScore: number | null;
+  liveHomeScore: number | null;
+  liveAwayScore: number | null;
+  liveClock: string | null;
   sport: Sport;
   odds: { homeOdds: number; awayOdds: number; drawOdds: number | null; homeDrawOdds: number | null; awayDrawOdds: number | null }[];
 }
@@ -109,6 +115,14 @@ export default function BetsPage() {
     loadBets();
     fetch("/api/events").then((r) => r.json()).then(setEvents);
   }, [loadBets]);
+
+  // Auto-refresh every 60s when any bet has a LIVE event
+  useEffect(() => {
+    const hasLive = bets.some((b: Bet) => b.event?.status === "LIVE");
+    if (!hasLive) return;
+    const id = setInterval(loadBets, 60_000);
+    return () => clearInterval(id);
+  }, [bets, loadBets]);
 
   const filteredBets = bets.filter((bet: Bet) => {
     if (filter === "open") return bet.status === "OPEN";

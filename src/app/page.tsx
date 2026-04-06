@@ -241,6 +241,48 @@ function TimeAgo({ date }: { date: Date }) {
   return <span>{Math.floor(diff / 86400)}d ago</span>;
 }
 
+type EventLike = {
+  status: string;
+  commenceTime: Date;
+  homeTeam: string;
+  awayTeam: string;
+  homeScore: number | null;
+  awayScore: number | null;
+  liveHomeScore: number | null;
+  liveAwayScore: number | null;
+  liveClock: string | null;
+};
+
+function EventMatchInfo({ event }: { event: EventLike }) {
+  if (event.status === "LIVE") {
+    return (
+      <div className="flex items-center gap-1.5 text-[11px] mt-0.5 flex-wrap">
+        <span className="flex items-center gap-1 font-bold" style={{ color: "#ef4444" }}>
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-current animate-pulse" />
+          LIVE
+        </span>
+        <span className="font-bold text-white">
+          {event.liveHomeScore ?? 0} – {event.liveAwayScore ?? 0}
+        </span>
+        {event.liveClock && (
+          <span className="text-text-muted">{event.liveClock}</span>
+        )}
+      </div>
+    );
+  }
+  if (event.status === "COMPLETED" && event.homeScore !== null && event.awayScore !== null) {
+    return (
+      <div className="flex items-center gap-1.5 text-[11px] mt-0.5">
+        <span className="text-text-muted">FT</span>
+        <span className="font-bold text-text-secondary">
+          {event.homeScore} – {event.awayScore}
+        </span>
+      </div>
+    );
+  }
+  return <div className="text-[11px] text-text-muted mt-0.5">{formatCET(event.commenceTime)}</div>;
+}
+
 // ─── PvP card ─────────────────────────────────────────────────────────────────
 
 type PvPBetWithRelations = {
@@ -260,6 +302,12 @@ type PvPBetWithRelations = {
     homeTeam: string;
     awayTeam: string;
     commenceTime: Date;
+    status: string;
+    homeScore: number | null;
+    awayScore: number | null;
+    liveHomeScore: number | null;
+    liveAwayScore: number | null;
+    liveClock: string | null;
     sport: { name: string; key: string };
   };
 };
@@ -364,7 +412,7 @@ function PvPCard({ bet }: { bet: PvPBetWithRelations }) {
         <div className="text-xs text-text-secondary">
           {bet.event.homeTeam} <span className="text-text-muted">vs</span> {bet.event.awayTeam}
         </div>
-        <div className="text-[11px] text-text-muted mt-0.5">{formatCET(bet.event.commenceTime)}</div>
+        <EventMatchInfo event={bet.event} />
       </div>
 
       {/* Footer */}
@@ -403,6 +451,12 @@ type TicketWithRelations = {
       homeTeam: string;
       awayTeam: string;
       commenceTime: Date;
+      status: string;
+      homeScore: number | null;
+      awayScore: number | null;
+      liveHomeScore: number | null;
+      liveAwayScore: number | null;
+      liveClock: string | null;
       sport: { name: string; key: string };
     };
   }[];
@@ -451,7 +505,7 @@ function TicketCard({ ticket }: { ticket: TicketWithRelations }) {
           return (
             <div key={sel.id} className="flex items-center justify-between px-3 py-2.5 text-sm gap-3">
               <div className="min-w-0">
-                <div className="flex items-center gap-1.5 mb-0.5">
+                <div className="flex items-center gap-1.5 mb-0.5 flex-wrap">
                   <span className="text-[10px] text-text-muted uppercase tracking-wide">
                     {leagueLabel(sel.event.sport)}
                   </span>
@@ -460,9 +514,28 @@ function TicketCard({ ticket }: { ticket: TicketWithRelations }) {
                     {formatCET(sel.event.commenceTime)}
                   </span>
                 </div>
-                <span className="text-text-secondary text-xs">
-                  {sel.event.homeTeam} vs {sel.event.awayTeam}
-                </span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-text-secondary text-xs">
+                    {sel.event.homeTeam} vs {sel.event.awayTeam}
+                  </span>
+                  {sel.event.status === "LIVE" && (
+                    <span className="flex items-center gap-1 text-[10px] font-bold" style={{ color: "#F0A818" }}>
+                      <span className="inline-block w-1 h-1 rounded-full bg-current animate-pulse" />
+                      LIVE {sel.event.liveHomeScore ?? 0}–{sel.event.liveAwayScore ?? 0}
+                      {sel.event.liveClock && (
+                        <span className="font-normal text-text-muted ml-1">{sel.event.liveClock}</span>
+                      )}
+                    </span>
+                  )}
+                  {sel.event.status === "COMPLETED" && sel.event.homeScore !== null && sel.event.awayScore !== null && (
+                    <span
+                      className="text-[10px] font-bold"
+                      style={{ color: sel.result === "WON" ? "#00c853" : sel.result === "LOST" ? "#ef4444" : "#888" }}
+                    >
+                      FT {sel.event.homeScore}–{sel.event.awayScore}
+                    </span>
+                  )}
+                </div>
                 <div className="text-text-primary font-medium mt-0.5">{pick}</div>
               </div>
               <div className="flex items-center gap-3 text-right shrink-0">
