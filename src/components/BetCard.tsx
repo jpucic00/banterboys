@@ -66,6 +66,8 @@ interface BetCardProps {
     event: {
       homeTeam: string;
       awayTeam: string;
+      homeLogoUrl: string | null;
+      awayLogoUrl: string | null;
       commenceTime: string;
       status: string;
       homeScore: number | null;
@@ -256,8 +258,12 @@ export default function BetCard({ bet, onJoin, onCancel }: BetCardProps) {
 
       {/* Match info */}
       <div className="px-3 pb-2.5 -mt-1">
-        <div className="text-xs text-text-secondary">
-          {bet.event.homeTeam} <span className="text-text-muted">vs</span> {bet.event.awayTeam}
+        <div className="text-xs text-text-secondary flex items-center gap-1 flex-wrap">
+          {bet.event.homeLogoUrl && <Image src={bet.event.homeLogoUrl} alt="" width={14} height={14} className="rounded-sm shrink-0" />}
+          {bet.event.homeTeam}
+          <span className="text-text-muted">vs</span>
+          {bet.event.awayLogoUrl && <Image src={bet.event.awayLogoUrl} alt="" width={14} height={14} className="rounded-sm shrink-0" />}
+          {bet.event.awayTeam}
         </div>
         {bet.event.status === "LIVE" ? (
           <div className="flex items-center gap-1.5 text-[11px] mt-0.5 flex-wrap">

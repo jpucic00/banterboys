@@ -4,11 +4,14 @@ import { useSession, signIn } from "next-auth/react";
 import { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { CoinAmount } from "@/components/CoinIcon";
+import Image from "next/image";
 
 interface Event {
   id: string;
   homeTeam: string;
   awayTeam: string;
+  homeLogoUrl: string | null;
+  awayLogoUrl: string | null;
   commenceTime: string;
   sport: { name: string; key: string };
   odds: { homeOdds: number; awayOdds: number; drawOdds: number | null; homeDrawOdds: number | null; awayDrawOdds: number | null }[];
@@ -577,8 +580,12 @@ export default function TicketsPage() {
                       >
                         {/* Teams + time row */}
                         <div className="flex items-center justify-between mb-2">
-                          <span className="text-sm font-medium text-text-primary">
-                            {event.homeTeam} <span className="text-text-muted font-normal">vs</span> {event.awayTeam}
+                          <span className="text-sm font-medium text-text-primary flex items-center gap-1.5">
+                            {event.homeLogoUrl && <Image src={event.homeLogoUrl} alt="" width={16} height={16} className="rounded-sm shrink-0" />}
+                            <span>{event.homeTeam}</span>
+                            <span className="text-text-muted font-normal">vs</span>
+                            {event.awayLogoUrl && <Image src={event.awayLogoUrl} alt="" width={16} height={16} className="rounded-sm shrink-0" />}
+                            <span>{event.awayTeam}</span>
                           </span>
                           <span className="text-xs text-text-muted ml-4 shrink-0">
                             {new Date(event.commenceTime).toLocaleDateString([], { month: "short", day: "numeric" })}{" "}
@@ -596,6 +603,7 @@ export default function TicketsPage() {
                                 selected={slipPick === "HOME"}
                                 disabled={inSlip}
                                 onClick={() => addToSlip(event, "HOME")}
+                                logoUrl={event.homeLogoUrl}
                               />
                               {odds.drawOdds && (
                                 <OddsButton
@@ -612,6 +620,7 @@ export default function TicketsPage() {
                                 selected={slipPick === "AWAY"}
                                 disabled={inSlip}
                                 onClick={() => addToSlip(event, "AWAY")}
+                                logoUrl={event.awayLogoUrl}
                               />
                             </div>
                             {odds.homeDrawOdds && odds.awayDrawOdds && (
@@ -932,12 +941,14 @@ function OddsButton({
   selected,
   disabled,
   onClick,
+  logoUrl,
 }: {
   label: string;
   odds: number;
   selected: boolean;
   disabled: boolean;
   onClick: () => void;
+  logoUrl?: string | null;
 }) {
   return (
     <button
@@ -949,6 +960,7 @@ function OddsButton({
           : "bg-bg-tertiary border border-border text-text-secondary hover:border-gold hover:text-white"
       }`}
     >
+      {logoUrl && <Image src={logoUrl} alt="" width={18} height={18} className="rounded-sm mb-0.5" />}
       <span className="truncate w-full text-center leading-tight mb-0.5" title={label}>
         {label.length > 12 ? label.split(" ").slice(-1)[0] : label}
       </span>

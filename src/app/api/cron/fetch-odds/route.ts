@@ -81,7 +81,7 @@ export async function GET(req: NextRequest) {
       // ── ESPN ID mapping ────────────────────────────────────────────────
       if (sportKey in ESPN_SPORT_MAP) {
         const unmapped = await prisma.event.findMany({
-          where: { sportId: sport.id, espnEventId: null },
+          where: { sportId: sport.id, OR: [{ espnEventId: null }, { homeLogoUrl: null }] },
         });
 
         if (unmapped.length > 0) {
@@ -116,17 +116,21 @@ export async function GET(req: NextRequest) {
                 continue;
               }
 
-              const espnId = findEspnMatch(
+              const espnMatch = findEspnMatch(
                 ev.homeTeam,
                 ev.awayTeam,
                 ev.commenceTime,
                 espnEvents,
                 sportKey
               );
-              if (espnId) {
+              if (espnMatch) {
                 await prisma.event.update({
                   where: { id: ev.id },
-                  data: { espnEventId: espnId },
+                  data: {
+                    espnEventId: espnMatch.id,
+                    homeLogoUrl: espnMatch.homeLogo ?? null,
+                    awayLogoUrl: espnMatch.awayLogo ?? null,
+                  },
                 }).catch(() => {});
                 mapped++;
               } else {

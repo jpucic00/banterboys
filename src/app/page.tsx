@@ -301,6 +301,8 @@ type PvPBetWithRelations = {
   event: {
     homeTeam: string;
     awayTeam: string;
+    homeLogoUrl: string | null;
+    awayLogoUrl: string | null;
     commenceTime: Date;
     status: string;
     homeScore: number | null;
@@ -409,8 +411,12 @@ function PvPCard({ bet }: { bet: PvPBetWithRelations }) {
 
       {/* Match info */}
       <div className="px-3 pb-2.5 -mt-1">
-        <div className="text-xs text-text-secondary">
-          {bet.event.homeTeam} <span className="text-text-muted">vs</span> {bet.event.awayTeam}
+        <div className="text-xs text-text-secondary flex items-center gap-1 flex-wrap">
+          {bet.event.homeLogoUrl && <Image src={bet.event.homeLogoUrl} alt="" width={14} height={14} className="rounded-sm shrink-0" />}
+          {bet.event.homeTeam}
+          <span className="text-text-muted">vs</span>
+          {bet.event.awayLogoUrl && <Image src={bet.event.awayLogoUrl} alt="" width={14} height={14} className="rounded-sm shrink-0" />}
+          {bet.event.awayTeam}
         </div>
         <EventMatchInfo event={bet.event} />
       </div>
@@ -450,6 +456,8 @@ type TicketWithRelations = {
     event: {
       homeTeam: string;
       awayTeam: string;
+      homeLogoUrl: string | null;
+      awayLogoUrl: string | null;
       commenceTime: Date;
       status: string;
       homeScore: number | null;
@@ -515,8 +523,12 @@ function TicketCard({ ticket }: { ticket: TicketWithRelations }) {
                   </span>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-text-secondary text-xs">
-                    {sel.event.homeTeam} vs {sel.event.awayTeam}
+                  <span className="text-text-secondary text-xs flex items-center gap-1">
+                    {sel.event.homeLogoUrl && <Image src={sel.event.homeLogoUrl} alt="" width={14} height={14} className="rounded-sm shrink-0" />}
+                    <span>{sel.event.homeTeam}</span>
+                    <span className="text-text-muted">vs</span>
+                    {sel.event.awayLogoUrl && <Image src={sel.event.awayLogoUrl} alt="" width={14} height={14} className="rounded-sm shrink-0" />}
+                    <span>{sel.event.awayTeam}</span>
                   </span>
                   {sel.event.status === "LIVE" && (
                     <span className="flex items-center gap-1 text-[10px] font-bold" style={{ color: "#F0A818" }}>

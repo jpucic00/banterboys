@@ -131,6 +131,8 @@ model Event {
   status        EventStatus @default(UPCOMING)
   completedAt   DateTime?
   espnEventId   String?     @unique
+  homeLogoUrl   String?
+  awayLogoUrl   String?
   updatedAt    DateTime    @updatedAt
 
   sport      Sport           @relation(fields: [sportId], references: [id])

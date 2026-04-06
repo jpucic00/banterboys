@@ -26,6 +26,8 @@ export interface EspnEvent {
   awayTeam: string;
   homeAbbrev?: string;
   awayAbbrev?: string;
+  homeLogo?: string;
+  awayLogo?: string;
   homeScore: number;
   awayScore: number;
   completed: boolean;
@@ -38,12 +40,29 @@ export interface EspnEvent {
 interface EspnCompetitor {
   homeAway?: "home" | "away";
   score: string;
-  team?: { displayName: string; abbreviation?: string };
+  team?: { displayName: string; abbreviation?: string; logo?: string };
   athlete?: { displayName: string };
 }
 
 function isSoccerSport(sportKey: string): boolean {
   return sportKey.startsWith("soccer_");
+}
+
+/** ESPN CDN league slug for sports where logos can be constructed from team abbreviation */
+const ABBREV_LOGO_CDN: Record<string, string> = {
+  basketball_nba: "nba",
+  americanfootball_nfl: "nfl",
+  icehockey_nhl: "nhl",
+  baseball_mlb: "mlb",
+};
+
+function resolveLogoUrl(sportKey: string, abbrev?: string, apiLogo?: string): string | undefined {
+  if (apiLogo) return apiLogo;
+  const cdnLeague = ABBREV_LOGO_CDN[sportKey];
+  if (cdnLeague && abbrev) {
+    return `https://a.espncdn.com/i/teamlogos/${cdnLeague}/500/${abbrev.toLowerCase()}.png`;
+  }
+  return undefined;
 }
 
 /** ESPN status names that indicate the match went beyond 90 minutes */
@@ -97,6 +116,8 @@ function parseEspnEvents(data: EspnScoreboardResponse, sportKey: string): EspnEv
         awayTeam: getCompetitorName(away),
         homeAbbrev: home.team?.abbreviation,
         awayAbbrev: away.team?.abbreviation,
+        homeLogo: resolveLogoUrl(sportKey, home.team?.abbreviation, home.team?.logo),
+        awayLogo: resolveLogoUrl(sportKey, away.team?.abbreviation, away.team?.logo),
         homeScore: parseFloat(home.score) || 0,
         awayScore: parseFloat(away.score) || 0,
         completed: comp.status.type.completed,
@@ -218,7 +239,7 @@ export function findEspnMatch(
   commenceTime: Date,
   espnEvents: EspnEvent[],
   sportKey?: string
-): string | null {
+): EspnEvent | null {
   const timeWindowMs = 48 * 60 * 60 * 1000; // 48h — covers ±1 day date boundary differences between Odds API and ESPN
 
   // ── 1. Abbreviation lookup (exact match, no time window needed) ──────────
@@ -229,8 +250,8 @@ export function findEspnMatch(
     const awayAbbrev = sportMap[awayTeam];
     if (homeAbbrev && awayAbbrev) {
       for (const e of espnEvents) {
-        if (e.homeAbbrev === homeAbbrev && e.awayAbbrev === awayAbbrev) return e.id;
-        if (e.homeAbbrev === awayAbbrev && e.awayAbbrev === homeAbbrev) return e.id; // reversed (MMA-style)
+        if (e.homeAbbrev === homeAbbrev && e.awayAbbrev === awayAbbrev) return e;
+        if (e.homeAbbrev === awayAbbrev && e.awayAbbrev === homeAbbrev) return e; // reversed (MMA-style)
       }
     }
   }
@@ -241,7 +262,7 @@ export function findEspnMatch(
   const correctedHome = TEAM_NAME_CORRECTIONS[homeTeam] ?? homeTeam;
   const correctedAway = TEAM_NAME_CORRECTIONS[awayTeam] ?? awayTeam;
 
-  let bestId: string | null = null;
+  let bestMatch: EspnEvent | null = null;
   let bestScore = -1;
 
   for (const e of espnEvents) {
@@ -260,9 +281,9 @@ export function findEspnMatch(
     const score = Math.max(score1, score2);
     if (score > bestScore) {
       bestScore = score;
-      bestId = e.id;
+      bestMatch = e;
     }
   }
 
-  return bestId;
+  return bestMatch;
 }

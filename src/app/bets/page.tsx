@@ -17,6 +17,8 @@ interface Event {
   id: string;
   homeTeam: string;
   awayTeam: string;
+  homeLogoUrl: string | null;
+  awayLogoUrl: string | null;
   commenceTime: string;
   status: string;
   homeScore: number | null;
@@ -490,9 +492,11 @@ function CreateBetModal({
                     cursor: "pointer", gap: 12,
                   }}
                 >
-                  <span style={{ fontSize: 13, color: "#e0e0e0", fontWeight: 600 }}>
+                  <span style={{ fontSize: 13, color: "#e0e0e0", fontWeight: 600, display: "flex", alignItems: "center", gap: 5 }}>
+                    {ev.homeLogoUrl && <Image src={ev.homeLogoUrl} alt="" width={16} height={16} style={{ borderRadius: 2 }} />}
                     {ev.homeTeam}
-                    <span style={{ color: "#555", fontWeight: 400, margin: "0 6px" }}>vs</span>
+                    <span style={{ color: "#555", fontWeight: 400 }}>vs</span>
+                    {ev.awayLogoUrl && <Image src={ev.awayLogoUrl} alt="" width={16} height={16} style={{ borderRadius: 2 }} />}
                     {ev.awayTeam}
                   </span>
                   <span style={{ fontSize: 10, color: "#555", whiteSpace: "nowrap", background: "#252525", padding: "2px 8px", borderRadius: 4 }}>
@@ -508,10 +512,10 @@ function CreateBetModal({
           {step === STEP.pick && selectedEvent && (() => {
             const snap = selectedEvent.odds[0];
             const hasDoubleChance = !!snap?.homeDrawOdds && !!snap?.awayDrawOdds;
-            const picks: { value: "HOME" | "AWAY" | "DRAW" | "HOME_DRAW" | "AWAY_DRAW"; label: string; sublabel: string; mktOdds: number | null }[] = [
-              { value: "HOME", label: selectedEvent.homeTeam, sublabel: "Home win", mktOdds: snap?.homeOdds ?? null },
+            const picks: { value: "HOME" | "AWAY" | "DRAW" | "HOME_DRAW" | "AWAY_DRAW"; label: string; sublabel: string; mktOdds: number | null; logoUrl?: string | null }[] = [
+              { value: "HOME", label: selectedEvent.homeTeam, sublabel: "Home win", mktOdds: snap?.homeOdds ?? null, logoUrl: selectedEvent.homeLogoUrl },
               ...(hasDrawOdds ? [{ value: "DRAW" as const, label: "Draw", sublabel: "Draw", mktOdds: snap?.drawOdds ?? null }] : []),
-              { value: "AWAY", label: selectedEvent.awayTeam, sublabel: "Away win", mktOdds: snap?.awayOdds ?? null },
+              { value: "AWAY", label: selectedEvent.awayTeam, sublabel: "Away win", mktOdds: snap?.awayOdds ?? null, logoUrl: selectedEvent.awayLogoUrl },
             ];
             const dcPicks: typeof picks = hasDoubleChance ? [
               { value: "HOME_DRAW", label: `${selectedEvent.homeTeam} or Draw`, sublabel: "1X", mktOdds: snap?.homeDrawOdds ?? null },
@@ -520,7 +524,7 @@ function CreateBetModal({
             return (
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 <div style={{ display: "grid", gridTemplateColumns: hasDrawOdds ? "1fr 1fr 1fr" : "1fr 1fr", gap: 8 }}>
-                  {picks.map(({ value, label, sublabel, mktOdds }) => (
+                  {picks.map(({ value, label, sublabel, mktOdds, logoUrl }) => (
                     <button
                       key={value}
                       onClick={() => selectPick(value)}
@@ -531,6 +535,11 @@ function CreateBetModal({
                       }}
                     >
                       <div style={{ fontSize: 9, color: "#555", textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: 4 }}>{sublabel}</div>
+                      {logoUrl && (
+                        <div style={{ display: "flex", justifyContent: "center", marginBottom: 4 }}>
+                          <Image src={logoUrl} alt="" width={24} height={24} style={{ borderRadius: 3 }} />
+                        </div>
+                      )}
                       <div style={{ fontSize: 12, fontWeight: 700, color: "#fff", lineHeight: 1.3 }}>{label}</div>
                       {mktOdds != null && (
                         <div style={{ fontSize: 11, color: "#888", marginTop: 6, fontFamily: "monospace" }}>
