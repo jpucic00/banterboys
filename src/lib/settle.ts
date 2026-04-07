@@ -92,9 +92,6 @@ export async function settleTicketSelections(eventId: string) {
   // Settle tickets: bust immediately on first loss, otherwise wait for all picks
   const ticketIds = [...new Set(selections.map((s) => s.ticketId))];
   for (const ticketId of ticketIds) {
-    const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
-    if (!ticket || ticket.status !== "PENDING") continue;
-
     const allSelections = await prisma.ticketSelection.findMany({
       where: { ticketId },
     });
@@ -103,10 +100,14 @@ export async function settleTicketSelections(eventId: string) {
 
     // Bust immediately if any pick lost — no need to wait for remaining picks
     if (anyLost) {
-      await prisma.ticket.update({
-        where: { id: ticketId },
+      // Atomic update: only the first concurrent caller transitions PENDING → LOST.
+      // If count === 0 the ticket was already settled (race with live/sweep), skip notification.
+      const { count } = await prisma.ticket.updateMany({
+        where: { id: ticketId, status: "PENDING" },
         data: { status: "LOST", settledAt: new Date() },
       });
+      if (count === 0) continue;
+
       const settled = await prisma.ticket.findUnique({
         where: { id: ticketId },
         include: {
@@ -125,10 +126,13 @@ export async function settleTicketSelections(eventId: string) {
     const allVoid = allSelections.every((s) => s.result === SelectionResult.VOID);
     const status = allVoid ? "VOID" : "WON";
 
-    await prisma.ticket.update({
-      where: { id: ticketId },
+    // Same atomic guard for WON/VOID transition
+    const { count } = await prisma.ticket.updateMany({
+      where: { id: ticketId, status: "PENDING" },
       data: { status, settledAt: new Date() },
     });
+    if (count === 0) continue;
+
     if (status !== "VOID") {
       const settled = await prisma.ticket.findUnique({
         where: { id: ticketId },
