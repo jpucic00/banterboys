@@ -453,7 +453,7 @@ export async function notifyTicketSettled(
     description = `**${userName}**'s slip is dead. The Amulet of Loss weeps.${siteLink("slip")}`;
     fields = [
       { name: "🧑 Player", value: userName, inline: true },
-      { name: "💰 Stake Lost", value: `0 ${currencyLabel}`, inline: true },
+      { name: "💰 Stake Lost", value: formatCurrency(ticket.amount, ticket.currency), inline: true },
       {
         name: "💀 Busted by",
         value: `${bustMatch}${bustScore}\nPick: **${bustPick}**`,

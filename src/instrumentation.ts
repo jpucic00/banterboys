@@ -7,7 +7,8 @@ export async function register() {
 
     const run = async (path: string) => {
       try {
-        const res = await fetch(`${base}${path}?secret=${encodeURIComponent(secret)}`);
+        const separator = path.includes("?") ? "&" : "?";
+        const res = await fetch(`${base}${path}${separator}secret=${encodeURIComponent(secret)}`);
         const json = await res.json();
         console.log(`[cron] ${path}`, json);
       } catch (err) {

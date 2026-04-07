@@ -24,14 +24,16 @@ export async function GET(req: NextRequest) {
  */
 async function runLiveScores() {
   const now = new Date();
-  const fourHoursAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000);
+  const sixHoursAgo = new Date(now.getTime() - 6 * 60 * 60 * 1000);
   const fiveMinutesAhead = new Date(now.getTime() + 5 * 60 * 1000);
   const todayStr = now.toISOString().slice(0, 10).replace(/-/g, "");
+  const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+  const yesterdayStr = yesterday.toISOString().slice(0, 10).replace(/-/g, "");
 
   // Find active events and their sports
   const activeEvents = await prisma.event.findMany({
     where: {
-      commenceTime: { gte: fourHoursAgo, lte: fiveMinutesAhead },
+      commenceTime: { gte: sixHoursAgo, lte: fiveMinutesAhead },
       status: { in: [EventStatus.UPCOMING, EventStatus.LIVE] },
       espnEventId: { not: null },
     },
@@ -53,8 +55,12 @@ async function runLiveScores() {
   for (const sportKey of activeSportKeys) {
     if (!ESPN_SPORT_MAP[sportKey]) continue;
     try {
-      const espnEvents = await fetchEspnEventsByDate(sportKey, todayStr);
-      const espnById = new Map(espnEvents.map((e) => [e.id, e]));
+      // Fetch both today and yesterday to catch games that started before midnight and ran past it
+      const [todayEvents, yesterdayEvents] = await Promise.all([
+        fetchEspnEventsByDate(sportKey, todayStr),
+        fetchEspnEventsByDate(sportKey, yesterdayStr),
+      ]);
+      const espnById = new Map([...yesterdayEvents, ...todayEvents].map((e) => [e.id, e]));
 
       const sportActiveEvents = activeEvents.filter((e) => e.sport.key === sportKey);
 
