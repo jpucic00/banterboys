@@ -123,7 +123,7 @@ function parseEspnEvents(data: EspnScoreboardResponse, sportKey: string): EspnEv
         completed: comp.status.type.completed,
         inProgress: comp.status.type.state === "in",
         eventDate: new Date(comp.date ?? event.date),
-        wentToExtraTime: isSoccerSport(sportKey) && EXTRA_TIME_STATUSES.has(comp.status.type.name ?? ""),
+        wentToExtraTime: (isSoccerSport(sportKey) || sportKey === 'icehockey_nhl') && EXTRA_TIME_STATUSES.has(comp.status.type.name ?? ""),
         statusDetail: comp.status.type.shortDetail,
       });
 

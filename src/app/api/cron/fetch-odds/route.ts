@@ -49,15 +49,12 @@ export async function GET(req: NextRequest) {
 
             if (homeOutcome && awayOutcome) {
               // Derive double chance odds from h2h: 1X = 1/(1/home + 1/draw), 2X = 1/(1/away + 1/draw)
-              // Apply 5% margin since derived odds are fair value (no house edge)
-              const DC_MARGIN = 0.05;
+              // No extra margin — bookmaker margin from h2h carries through. Floor at 1.05 for heavy favorites.
               const drawPrice = drawOutcome?.price ?? null;
-              const homeDrawOdds = drawPrice
-                ? Math.round((1 / (1 / homeOutcome.price + 1 / drawPrice)) * (1 - DC_MARGIN) * 100) / 100
-                : null;
-              const awayDrawOdds = drawPrice
-                ? Math.round((1 / (1 / awayOutcome.price + 1 / drawPrice)) * (1 - DC_MARGIN) * 100) / 100
-                : null;
+              const rawHomeDraw = drawPrice ? 1 / (1 / homeOutcome.price + 1 / drawPrice) : null;
+              const rawAwayDraw = drawPrice ? 1 / (1 / awayOutcome.price + 1 / drawPrice) : null;
+              const homeDrawOdds = rawHomeDraw ? Math.round(Math.max(rawHomeDraw, 1.05) * 100) / 100 : null;
+              const awayDrawOdds = rawAwayDraw ? Math.round(Math.max(rawAwayDraw, 1.05) * 100) / 100 : null;
 
               await prisma.oddsSnapshot.create({
                 data: {
