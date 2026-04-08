@@ -16,6 +16,7 @@ export const ESPN_SPORT_MAP: Record<string, string> = {
   soccer_fifa_world_cup:                      "soccer/fifa.world",
   soccer_fifa_world_cup_qualifiers_europe:    "soccer/fifa.worldq.uefa",
   soccer_netherlands_eredivisie:              "soccer/ned.1",
+  soccer_france_ligue_one:                   "soccer/fra.1",
   icehockey_nhl:                              "hockey/nhl",
   mma_mixed_martial_arts:                     "mma/ufc",
 };
