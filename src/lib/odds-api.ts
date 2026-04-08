@@ -15,6 +15,7 @@ const SPORT_KEYS = [
   "soccer_fifa_world_cup_qualifiers_europe",
   "soccer_netherlands_eredivisie",
   "soccer_france_ligue_one",
+  "soccer_conmebol_copa_libertadores",
   "icehockey_nhl",
   "mma_mixed_martial_arts",
 ];

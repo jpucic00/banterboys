@@ -7,7 +7,7 @@
  * Coverage: basketball_nba, soccer_epl, soccer_spain_la_liga, soccer_germany_bundesliga,
  *           soccer_italy_serie_a, soccer_netherlands_eredivisie, soccer_france_ligue_one,
  *           soccer_brazil_campeonato,
- *           icehockey_nhl, soccer_uefa_champs_league,
+ *           icehockey_nhl, soccer_uefa_champs_league, soccer_conmebol_copa_libertadores (partial),
  *           soccer_fifa_world_cup (partial — only teams with known Odds API ↔ ESPN name divergence).
  *
  * Multiple Odds API name variants for the same team are included as separate keys.
@@ -427,6 +427,31 @@ export const ODDS_TO_ESPN_ABBREV: Record<string, Record<string, string>> = {
   soccer_uefa_europa_conference_league: {
     "Man United": "MAN",
     "Manchester United": "MAN",
+  },
+
+  // Copa Libertadores: only clubs with known Odds API ↔ ESPN name divergence.
+  // Most club names are close enough for fuzzy matching (0.65 threshold).
+  soccer_conmebol_copa_libertadores: {
+    "Atletico Mineiro": "CAM",
+    "Atlético Mineiro": "CAM",
+    "River Plate": "RIV",
+    "CA River Plate": "RIV",
+    "Boca Juniors": "BOC",
+    "CA Boca Juniors": "BOC",
+    "Flamengo": "FLA",
+    "CR Flamengo": "FLA",
+    "Fluminense": "FLU",
+    "Fluminense FC": "FLU",
+    "Palmeiras": "PAL",
+    "SE Palmeiras": "PAL",
+    "Nacional": "NAC",
+    "Club Nacional": "NAC",
+    "Penarol": "PEN",
+    "Club Atletico Penarol": "PEN",
+    "Peñarol": "PEN",
+    "Independiente del Valle": "IDV",
+    "LDU Quito": "LDU",
+    "Liga de Quito": "LDU",
   },
 
   // World Cup: only entries where Odds API name diverges from ESPN displayName.
