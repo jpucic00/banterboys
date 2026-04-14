@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
+import SaldoManager from "@/components/SaldoManager";
 
 export const dynamic = "force-dynamic";
 
@@ -165,6 +166,11 @@ export default async function AdminPage() {
             sub={`${activeEvents} active events`}
           />
         </StatGrid>
+      </Section>
+
+      {/* Player Saldos */}
+      <Section title="Player Saldos">
+        <SaldoManager />
       </Section>
 
       {/* Ticket counts */}

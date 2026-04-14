@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { EventStatus } from "@prisma/client";
 import { notifyTicketCreated } from "@/lib/discord-notify";
+import { adjustSaldo } from "@/lib/saldo";
 
 export async function GET() {
   const session = await auth();
@@ -114,6 +115,7 @@ export async function POST(req: NextRequest) {
     },
   });
 
+  await adjustSaldo(session.user.id, currency || "GOLD", -parseFloat(amount));
   notifyTicketCreated(ticket, session.user).catch(() => {});
   return NextResponse.json(ticket, { status: 201 });
 }

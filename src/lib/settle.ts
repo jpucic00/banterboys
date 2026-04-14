@@ -1,6 +1,7 @@
 import { prisma } from "./db";
 import { EventStatus, Pick, PvPBetStatus, SelectionResult } from "@prisma/client";
 import { notifyBetSettled, notifyBetVoided, notifyTicketSettled } from "./discord-notify";
+import { adjustSaldo } from "./saldo";
 
 function getWinningPick(homeScore: number, awayScore: number): Pick {
   if (homeScore > awayScore) return Pick.HOME;
@@ -108,6 +109,8 @@ export async function settleTicketSelections(eventId: string) {
       });
       if (count === 0) continue;
 
+      // No saldo change on loss — stake was already deducted at placement
+
       const settled = await prisma.ticket.findUnique({
         where: { id: ticketId },
         include: {
@@ -133,15 +136,23 @@ export async function settleTicketSelections(eventId: string) {
     });
     if (count === 0) continue;
 
-    if (status !== "VOID") {
-      const settled = await prisma.ticket.findUnique({
-        where: { id: ticketId },
-        include: {
-          user: { select: { name: true, alias: true } },
-          selections: { include: { event: true } },
-        },
-      });
-      if (settled) notifyTicketSettled(settled, status).catch(() => {});
+    // Fetch ticket for saldo update and notification
+    const settled = await prisma.ticket.findUnique({
+      where: { id: ticketId },
+      include: {
+        user: { select: { id: true, name: true, alias: true } },
+        selections: { include: { event: true } },
+      },
+    });
+
+    if (settled) {
+      if (status === "WON") {
+        await adjustSaldo(settled.userId, settled.currency, settled.potentialPayout);
+        notifyTicketSettled(settled, status).catch(() => {});
+      } else {
+        // VOID — refund the original stake
+        await adjustSaldo(settled.userId, settled.currency, settled.amount);
+      }
     }
   }
 }

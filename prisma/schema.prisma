@@ -100,6 +100,8 @@ model User {
   image         String?
   role          UserRole  @default(USER)
   createdAt     DateTime  @default(now())
+  saldoGold       Float   @default(0)
+  saldoTibiaCoins Float   @default(0)
 
   accounts       Account[]
   sessions       Session[]

@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useSession, signIn, signOut } from "next-auth/react";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import PlayerSaldo from "./PlayerSaldo";
 
 export default function Navbar() {
   const { data: session } = useSession();
@@ -47,26 +48,29 @@ export default function Navbar() {
         <div className="flex items-center gap-3">
           {session ? (
             <>
-              <div className="flex items-center gap-2">
-                {session.user.image && (
-                  <Image
-                    src={session.user.image}
-                    alt=""
-                    width={26}
-                    height={26}
-                    className="rounded-full ring-1 ring-border-light"
-                  />
-                )}
-                <span className="text-sm text-text-secondary hidden sm:block">
-                  {session.user.alias ?? session.user.name}
-                </span>
+              <div className="flex flex-col items-end gap-1">
+                <div className="flex items-center gap-2">
+                  {session.user.image && (
+                    <Image
+                      src={session.user.image}
+                      alt=""
+                      width={26}
+                      height={26}
+                      className="rounded-full ring-1 ring-border-light"
+                    />
+                  )}
+                  <span className="text-sm text-text-secondary">
+                    {session.user.alias ?? session.user.name}
+                  </span>
+                  <button
+                    onClick={() => signOut()}
+                    className="text-[10px] text-text-muted hover:text-loss transition-colors cursor-pointer hidden sm:block"
+                  >
+                    Sign out
+                  </button>
+                </div>
+                <PlayerSaldo />
               </div>
-              <button
-                onClick={() => signOut()}
-                className="text-xs text-text-muted hover:text-loss transition-colors"
-              >
-                Sign out
-              </button>
             </>
           ) : (
             <button
