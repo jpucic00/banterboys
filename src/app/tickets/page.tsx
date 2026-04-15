@@ -243,9 +243,28 @@ function TicketCard({ ticket }: { ticket: any }) {
                     {formatCET(sel.event.commenceTime)}
                   </span>
                 </div>
-                <span className="text-text-secondary text-xs">
-                  {sel.event.homeTeam} vs {sel.event.awayTeam}
-                </span>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="text-text-secondary text-xs">
+                    {sel.event.homeTeam} vs {sel.event.awayTeam}
+                  </span>
+                  {sel.event.status === "LIVE" && (
+                    <span className="flex items-center gap-1 text-[10px] font-bold" style={{ color: "#F0A818" }}>
+                      <span className="inline-block w-1 h-1 rounded-full bg-current animate-pulse" />
+                      LIVE {sel.event.liveHomeScore ?? 0}–{sel.event.liveAwayScore ?? 0}
+                      {sel.event.liveClock && (
+                        <span className="font-normal text-text-muted ml-1">{sel.event.liveClock}</span>
+                      )}
+                    </span>
+                  )}
+                  {sel.event.status === "COMPLETED" && sel.event.homeScore !== null && sel.event.awayScore !== null && (
+                    <span
+                      className="text-[10px] font-bold"
+                      style={{ color: sel.result === "WON" ? "#00c853" : sel.result === "LOST" ? "#ef4444" : "#888" }}
+                    >
+                      FT {sel.event.homeScore}–{sel.event.awayScore}
+                    </span>
+                  )}
+                </div>
                 <div className="text-text-primary font-medium mt-0.5">{pickLabel}</div>
               </div>
               <div className="flex items-center gap-3 text-right shrink-0">
