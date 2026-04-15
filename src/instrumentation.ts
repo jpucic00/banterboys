@@ -3,10 +3,10 @@ export async function register() {
     const cron = await import("node-cron");
 
     const secret = process.env.CRON_SECRET ?? "";
-    const base = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
 
     const run = async (path: string) => {
       try {
+        const base = `http://localhost:${process.env.PORT ?? "3000"}`;
         const separator = path.includes("?") ? "&" : "?";
         const res = await fetch(`${base}${path}${separator}secret=${encodeURIComponent(secret)}`);
         const json = await res.json();
