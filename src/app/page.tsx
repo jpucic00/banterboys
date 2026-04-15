@@ -136,7 +136,7 @@ export default async function Home({
           <p className="text-text-muted text-sm text-center py-10">No bets yet.</p>
         )}
 
-        <div className="space-y-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           {pageFeed.map((item) =>
             item.type === "pvp" ? (
               <PvPCard key={`pvp-${item.data.id}`} bet={item.data} />

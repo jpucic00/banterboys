@@ -794,9 +794,9 @@ export default function TicketsPage() {
       )}
 
       {tab === "mine" && (
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
           {tickets.length === 0 && (
-            <p className="text-text-muted text-center py-10 text-sm">
+            <p className="text-text-muted text-center py-10 text-sm col-span-full">
               No slips yet. Build one!
             </p>
           )}

@@ -40,72 +40,72 @@ export default async function HistoryPage() {
         {pvpBets.length === 0 && (
           <p className="text-text-muted text-sm">No settled PvP bets yet.</p>
         )}
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-border text-text-muted text-left">
-                <th className="pb-2 pr-4">Match</th>
-                <th className="pb-2 pr-4">Creator</th>
-                <th className="pb-2 pr-4">Acceptor</th>
-                <th className="pb-2 pr-4">Creator Pick</th>
-                <th className="pb-2 pr-4">Creator Stake</th>
-                <th className="pb-2 pr-4">Joiner Pick</th>
-                <th className="pb-2 pr-4">Joiner Stake</th>
-                <th className="pb-2">Result</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pvpBets.map((bet) => (
-                <tr key={bet.id} className="border-b border-border/30">
-                  <td className="py-3 pr-4 text-text-primary">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+          {pvpBets.map((bet) => {
+            const creatorPick =
+              bet.pick === "HOME" ? bet.event.homeTeam
+              : bet.pick === "AWAY" ? bet.event.awayTeam
+              : bet.pick === "HOME_DRAW" ? `${bet.event.homeTeam} or Draw`
+              : bet.pick === "AWAY_DRAW" ? `${bet.event.awayTeam} or Draw`
+              : "Draw";
+            const jp = bet.joinerPick ?? (bet.pick === "HOME" ? "AWAY" : bet.pick === "AWAY" ? "HOME" : bet.pick === "HOME_DRAW" ? "AWAY" : bet.pick === "AWAY_DRAW" ? "HOME" : "HOME");
+            const joinerPick =
+              jp === "HOME" ? bet.event.homeTeam
+              : jp === "AWAY" ? bet.event.awayTeam
+              : jp === "HOME_DRAW" ? `${bet.event.homeTeam} or Draw`
+              : jp === "AWAY_DRAW" ? `${bet.event.awayTeam} or Draw`
+              : "Draw";
+            const resultLabel =
+              bet.status === "WON_CREATOR" ? `${bet.creator.name} won`
+              : bet.status === "WON_ACCEPTOR" ? `${bet.acceptor?.name} won`
+              : bet.status;
+            const resultColor =
+              bet.status === "WON_CREATOR" || bet.status === "WON_ACCEPTOR"
+                ? "text-win"
+                : "text-text-muted";
+
+            return (
+              <div
+                key={bet.id}
+                className="rounded-2xl border border-border-light/50 p-4 space-y-3"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-text-primary text-sm font-medium">
                     {bet.event.homeTeam} vs {bet.event.awayTeam}
-                  </td>
-                  <td className="py-3 pr-4 text-text-muted">
-                    {bet.creator.name}
-                  </td>
-                  <td className="py-3 pr-4 text-text-muted">
-                    {bet.acceptor?.name ?? "-"}
-                  </td>
-                  <td className="py-3 pr-4 text-gold">
-                    {bet.pick === "HOME" ? bet.event.homeTeam
-                      : bet.pick === "AWAY" ? bet.event.awayTeam
-                      : bet.pick === "HOME_DRAW" ? `${bet.event.homeTeam} or Draw`
-                      : bet.pick === "AWAY_DRAW" ? `${bet.event.awayTeam} or Draw`
-                      : "Draw"}
-                  </td>
-                  <td className="py-3 pr-4 text-text-primary">
-                    <CoinAmount amount={bet.amount} currency={bet.currency} />
-                  </td>
-                  <td className="py-3 pr-4 text-gold">
-                    {(() => {
-                      const jp = bet.joinerPick ?? (bet.pick === "HOME" ? "AWAY" : bet.pick === "AWAY" ? "HOME" : bet.pick === "HOME_DRAW" ? "AWAY" : bet.pick === "AWAY_DRAW" ? "HOME" : "HOME");
-                      return jp === "HOME" ? bet.event.homeTeam
-                        : jp === "AWAY" ? bet.event.awayTeam
-                        : jp === "HOME_DRAW" ? `${bet.event.homeTeam} or Draw`
-                        : jp === "AWAY_DRAW" ? `${bet.event.awayTeam} or Draw`
-                        : "Draw";
-                    })()}
-                  </td>
-                  <td className="py-3 pr-4 text-text-primary">
-                    <CoinAmount amount={bet.joinerAmount ?? Math.round(bet.amount * bet.odds)} currency={bet.currency} />
-                  </td>
-                  <td
-                    className={`py-3 font-medium ${
-                      bet.status === "WON_CREATOR" || bet.status === "WON_ACCEPTOR"
-                        ? "text-win"
-                        : "text-text-muted"
-                    }`}
-                  >
-                    {bet.status === "WON_CREATOR"
-                      ? `${bet.creator.name} won`
-                      : bet.status === "WON_ACCEPTOR"
-                        ? `${bet.acceptor?.name} won`
-                        : bet.status}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </span>
+                  <span className={`text-xs font-medium ${resultColor}`}>
+                    {resultLabel}
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-3 text-sm">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-text-muted text-xs">Creator</div>
+                    <div className="text-text-primary truncate">{bet.creator.name}</div>
+                    <div className="text-gold text-xs mt-0.5">{creatorPick}</div>
+                    <div className="text-text-secondary text-xs mt-0.5">
+                      <CoinAmount amount={bet.amount} currency={bet.currency} />
+                    </div>
+                  </div>
+                  <span className="text-xs font-black text-text-muted shrink-0">VS</span>
+                  <div className="flex-1 min-w-0 text-right">
+                    <div className="text-text-muted text-xs">Acceptor</div>
+                    <div className="text-text-primary truncate">{bet.acceptor?.name ?? "-"}</div>
+                    <div className="text-gold text-xs mt-0.5">{joinerPick}</div>
+                    <div className="text-text-secondary text-xs mt-0.5">
+                      <CoinAmount amount={bet.joinerAmount ?? Math.round(bet.amount * bet.odds)} currency={bet.currency} />
+                    </div>
+                  </div>
+                </div>
+
+                {bet.settledAt && (
+                  <div className="text-text-muted text-xs border-t border-border pt-2">
+                    Settled {new Date(bet.settledAt).toLocaleDateString()}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
