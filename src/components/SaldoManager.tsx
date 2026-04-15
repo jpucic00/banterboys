@@ -86,7 +86,7 @@ export default function SaldoManager() {
   }
 
   function copyPayoutText(alias: string, amount: number) {
-    const text = `Transfer ${Math.abs(Math.round(amount))} to Jetlife`;
+    const text = `Transfer ${Math.abs(Math.round(amount))} to Banter House`;
     navigator.clipboard.writeText(text);
     setCopied(alias);
     setTimeout(() => setCopied(null), 2000);
