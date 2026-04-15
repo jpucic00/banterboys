@@ -1,15 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { isAdminEmail } from "@/lib/admin";
 import { Currency } from "@prisma/client";
-
-function isAdmin(email: string | null | undefined) {
-  return email && email === process.env.ADMIN_EMAIL;
-}
 
 export async function GET() {
   const session = await auth();
-  if (!isAdmin(session?.user?.email)) {
+  if (!isAdminEmail(session?.user?.email)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
@@ -30,7 +27,7 @@ export async function GET() {
 
 export async function PATCH(req: NextRequest) {
   const session = await auth();
-  if (!isAdmin(session?.user?.email)) {
+  if (!isAdminEmail(session?.user?.email)) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 

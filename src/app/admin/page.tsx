@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import SaldoManager from "@/components/SaldoManager";
+import { isAdminEmail } from "@/lib/admin";
 
 export const dynamic = "force-dynamic";
 
@@ -98,9 +99,8 @@ function calcPvPStats(bets: PvPRow[]): PvPStats {
 
 export default async function AdminPage() {
   const session = await auth();
-  const adminEmail = process.env.ADMIN_EMAIL;
 
-  if (!session?.user?.email || !adminEmail || session.user.email !== adminEmail) {
+  if (!isAdminEmail(session?.user?.email)) {
     redirect("/");
   }
 
@@ -125,7 +125,6 @@ export default async function AdminPage() {
   const goldTickets = calcTicketStats(allTickets.filter((t) => t.currency === "GOLD"));
   const tcTickets = calcTicketStats(allTickets.filter((t) => t.currency === "TIBIA_COINS"));
 
-  const pvpAll = calcPvPStats(allPvPBets);
   const pvpGold = calcPvPStats(allPvPBets.filter((b) => b.currency === "GOLD"));
   const pvpTc = calcPvPStats(allPvPBets.filter((b) => b.currency === "TIBIA_COINS"));
 
@@ -257,18 +256,9 @@ export default async function AdminPage() {
 
       {/* PvP bets */}
       <Section title="PvP Bets">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <PvPCard label="Gold" stats={pvpGold} unit="gp" />
           <PvPCard label="Tibia Coins" stats={pvpTc} unit="TC" />
-        </div>
-        <div className="rounded-xl border border-border-light/30 p-4">
-          <p className="text-xs text-text-muted uppercase tracking-wide mb-3">All-time totals</p>
-          <div className="flex flex-wrap gap-x-8 gap-y-2 text-sm">
-            <KV label="Total volume" value={fmt(pvpAll.volume) + " gp"} />
-            <KV label="Total bets" value={String(pvpAll.counts.total)} />
-            <KV label="Settled" value={String(pvpAll.counts.settled)} />
-            <KV label="Cancelled / Void" value={`${pvpAll.counts.cancelled} / ${pvpAll.counts.void}`} />
-          </div>
         </div>
       </Section>
     </div>
