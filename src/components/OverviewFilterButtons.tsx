@@ -16,7 +16,9 @@ export default function OverviewFilterButtons({ current }: { current: string }) 
     } else {
       params.set("filter", value);
     }
-    router.push(`${pathname}?${params.toString()}`);
+    params.delete("page");
+    const query = params.toString();
+    router.push(query ? `${pathname}?${query}` : pathname);
   }
 
   const filters = [

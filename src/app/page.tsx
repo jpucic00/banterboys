@@ -11,14 +11,16 @@ export const dynamic = "force-dynamic";
 
 const ACTIVE_PVP_STATUSES: PvPBetStatus[] = ["OPEN", "MATCHED"];
 const ACTIVE_TICKET_STATUSES: TicketStatus[] = ["PENDING"];
+const PAGE_SIZE = 20;
 
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ filter?: string }>;
+  searchParams: Promise<{ filter?: string; page?: string }>;
 }) {
-  const { filter: filterParam } = await searchParams;
+  const { filter: filterParam, page: pageParam } = await searchParams;
   const filter = filterParam === "all" ? "all" : "active";
+  const requestedPage = Math.max(1, Number(pageParam) || 1);
 
   const [pvpBets, tickets] = await Promise.all([
     prisma.pvPBet.findMany({
@@ -29,7 +31,6 @@ export default async function Home({
         event: { include: { sport: true } },
       },
       orderBy: { createdAt: "desc" },
-      take: 30,
     }),
     prisma.ticket.findMany({
       where: filter === "active" ? { status: { in: ACTIVE_TICKET_STATUSES } } : undefined,
@@ -38,7 +39,6 @@ export default async function Home({
         selections: { include: { event: { include: { sport: true } } } },
       },
       orderBy: { createdAt: "desc" },
-      take: 30,
     }),
   ]);
 
@@ -48,9 +48,13 @@ export default async function Home({
     | { type: "ticket"; date: Date; data: TicketWithRelations };
 
   const feed: HistoryItem[] = [
-    ...pvpBets.map((b) => ({ type: "pvp" as const, date: b.createdAt, data: b })),
-    ...tickets.map((t) => ({ type: "ticket" as const, date: t.createdAt, data: t })),
+    ...pvpBets.map((b) => ({ type: "pvp" as const, date: b.settledAt ?? b.createdAt, data: b })),
+    ...tickets.map((t) => ({ type: "ticket" as const, date: t.settledAt ?? t.createdAt, data: t })),
   ].sort((a, b) => b.date.getTime() - a.date.getTime());
+
+  const totalPages = Math.max(1, Math.ceil(feed.length / PAGE_SIZE));
+  const currentPage = Math.min(requestedPage, totalPages);
+  const pageFeed = feed.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   return (
     <div className="space-y-5">
@@ -133,7 +137,7 @@ export default async function Home({
         )}
 
         <div className="space-y-2">
-          {feed.map((item) =>
+          {pageFeed.map((item) =>
             item.type === "pvp" ? (
               <PvPCard key={`pvp-${item.data.id}`} bet={item.data} />
             ) : (
@@ -141,7 +145,60 @@ export default async function Home({
             )
           )}
         </div>
+
+        {totalPages > 1 && (
+          <Pagination currentPage={currentPage} totalPages={totalPages} filter={filter} />
+        )}
       </div>
+    </div>
+  );
+}
+
+function Pagination({
+  currentPage,
+  totalPages,
+  filter,
+}: {
+  currentPage: number;
+  totalPages: number;
+  filter: string;
+}) {
+  const buildHref = (page: number) => {
+    const params = new URLSearchParams();
+    if (filter === "all") params.set("filter", "all");
+    if (page > 1) params.set("page", String(page));
+    const query = params.toString();
+    return query ? `/?${query}` : "/";
+  };
+
+  const prevDisabled = currentPage <= 1;
+  const nextDisabled = currentPage >= totalPages;
+
+  const linkClass = "px-3 py-1 rounded text-xs font-medium uppercase tracking-wide transition-colors";
+  const enabledStyle = { background: "#1f1f1f", border: "1px solid #333", color: "#fff" };
+  const disabledStyle = { background: "transparent", border: "1px solid transparent", color: "#444", pointerEvents: "none" as const };
+
+  return (
+    <div className="flex items-center justify-center gap-2 pt-4">
+      <Link
+        href={buildHref(currentPage - 1)}
+        className={linkClass}
+        style={prevDisabled ? disabledStyle : enabledStyle}
+        aria-disabled={prevDisabled}
+      >
+        Prev
+      </Link>
+      <span className="text-xs text-text-muted px-2">
+        Page {currentPage} of {totalPages}
+      </span>
+      <Link
+        href={buildHref(currentPage + 1)}
+        className={linkClass}
+        style={nextDisabled ? disabledStyle : enabledStyle}
+        aria-disabled={nextDisabled}
+      >
+        Next
+      </Link>
     </div>
   );
 }
