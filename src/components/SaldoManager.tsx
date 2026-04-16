@@ -105,7 +105,7 @@ export default function SaldoManager() {
   }
 
   return (
-    <div className="space-y-3">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       {users.map((user) => (
         <div
           key={user.id}

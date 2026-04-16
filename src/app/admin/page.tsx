@@ -107,7 +107,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const { tab = "overview" } = await searchParams;
   const isTrolian = tab === "trolian";
-  const trolianCutoff = new Date("2026-04-16T00:00:00Z");
+  const trolianCutoff = new Date("2026-04-16T00:00:00+02:00");
 
   const now = new Date();
   const day7Ago = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
