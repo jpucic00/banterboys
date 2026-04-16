@@ -40,7 +40,7 @@ export default async function HistoryPage() {
         {pvpBets.length === 0 && (
           <p className="text-text-muted text-sm">No settled PvP bets yet.</p>
         )}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+        <div className="columns-1 md:columns-2 gap-4">
           {pvpBets.map((bet) => {
             const creatorPick =
               bet.pick === "HOME" ? bet.event.homeTeam

@@ -794,14 +794,16 @@ export default function TicketsPage() {
       )}
 
       {tab === "mine" && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+        <div className="columns-1 md:columns-2 gap-4">
           {tickets.length === 0 && (
-            <p className="text-text-muted text-center py-10 text-sm col-span-full">
+            <p className="text-text-muted text-center py-10 text-sm">
               No slips yet. Build one!
             </p>
           )}
           {tickets.map((ticket) => (
-            <TicketCard key={ticket.id} ticket={ticket} />
+            <div key={ticket.id} className="break-inside-avoid mb-4">
+              <TicketCard ticket={ticket} />
+            </div>
           ))}
         </div>
       )}

@@ -165,13 +165,15 @@ export default function BetsPage() {
       </div>
 
       {/* Bet list */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
-        {filteredBets.map((bet: Bet) => (
-          <BetCard key={bet.id} bet={bet} onJoin={loadBets} onCancel={loadBets} />
-        ))}
+      <div className="columns-1 md:columns-2 gap-4">
         {filteredBets.length === 0 && (
-          <p className="text-text-muted text-sm text-center py-10 col-span-full">No bets found.</p>
+          <p className="text-text-muted text-sm text-center py-10">No bets found.</p>
         )}
+        {filteredBets.map((bet: Bet) => (
+          <div key={bet.id} className="break-inside-avoid mb-4">
+            <BetCard bet={bet} onJoin={loadBets} onCancel={loadBets} />
+          </div>
+        ))}
       </div>
 
       {/* Wizard modal */}

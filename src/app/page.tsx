@@ -136,7 +136,8 @@ export default async function Home({
           <p className="text-text-muted text-sm text-center py-10">No bets yet.</p>
         )}
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+        {/* Mobile: single interleaved feed */}
+        <div className="md:hidden space-y-4">
           {pageFeed.map((item) =>
             item.type === "pvp" ? (
               <PvPCard key={`pvp-${item.data.id}`} bet={item.data} />
@@ -144,6 +145,26 @@ export default async function Home({
               <TicketCard key={`ticket-${item.data.id}`} ticket={item.data} />
             )
           )}
+        </div>
+
+        {/* Desktop: split columns — slips left, PvP right */}
+        <div className="hidden md:grid md:grid-cols-2 gap-4 items-start">
+          <div className="space-y-4">
+            {pageFeed.filter((item) => item.type === "ticket").map((item) => (
+              <TicketCard key={`ticket-${item.data.id}`} ticket={item.data as TicketWithRelations} />
+            ))}
+            {pageFeed.filter((item) => item.type === "ticket").length === 0 && (
+              <p className="text-text-muted text-sm text-center py-6">No bet slips.</p>
+            )}
+          </div>
+          <div className="space-y-4">
+            {pageFeed.filter((item) => item.type === "pvp").map((item) => (
+              <PvPCard key={`pvp-${item.data.id}`} bet={item.data as PvPBetWithRelations} />
+            ))}
+            {pageFeed.filter((item) => item.type === "pvp").length === 0 && (
+              <p className="text-text-muted text-sm text-center py-6">No PvP bets.</p>
+            )}
+          </div>
         </div>
 
         {totalPages > 1 && (
