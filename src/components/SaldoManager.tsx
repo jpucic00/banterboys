@@ -86,7 +86,7 @@ export default function SaldoManager() {
   }
 
   function copyPayoutText(alias: string, amount: number) {
-    const text = `Transfer ${Math.abs(Math.round(amount))} to Banter House`;
+    const text = `Transfer ${Math.abs(Math.round(amount))} to ${alias}`;
     navigator.clipboard.writeText(text);
     setCopied(alias);
     setTimeout(() => setCopied(null), 2000);
@@ -146,7 +146,7 @@ export default function SaldoManager() {
             onAdjust={() => handleAdjust(user.id, "GOLD")}
             onPaid={() => handlePaid(user.id, "GOLD")}
             copyButton={
-              user.saldoGold < 0 ? (
+              user.saldoGold > 0 ? (
                 <button
                   onClick={() => copyPayoutText(user.alias ?? "", user.saldoGold)}
                   className="px-2 py-1 text-xs rounded-lg bg-bg-tertiary border border-border-light/30 text-text-secondary hover:text-text-primary transition-colors"
@@ -208,19 +208,19 @@ function SaldoRow({
 
   return (
     <div className="flex flex-wrap items-center gap-3 text-sm">
-      {/* Label + amount */}
-      <div className="flex items-center gap-1.5 min-w-[120px]">
+      {/* Label + amount — min-w keeps buttons stable when value changes */}
+      <div className="flex items-center gap-1.5 min-w-[140px]">
         <Image
           src={coinSrc}
           alt={coinAlt}
           width={16}
           height={16}
-          className="inline-block"
+          className="inline-block shrink-0"
           style={{ imageRendering: "pixelated" }}
         />
         <span className="text-text-muted">{label}:</span>
         <span
-          className={`font-mono font-semibold ${
+          className={`font-mono font-semibold tabular-nums ${
             isNegative ? "text-loss" : isPositive ? "text-win" : "text-text-primary"
           }`}
         >
@@ -230,7 +230,7 @@ function SaldoRow({
       </div>
 
       {/* Adjust input */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-2">
         <input
           type="number"
           placeholder="Adjust"

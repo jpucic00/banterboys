@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import SaldoManager from "@/components/SaldoManager";
 import { isAdminEmail } from "@/lib/admin";
+import AdminTabs from "@/components/AdminTabs";
 
 export const dynamic = "force-dynamic";
 
@@ -97,12 +98,16 @@ function calcPvPStats(bets: PvPRow[]): PvPStats {
   };
 }
 
-export default async function AdminPage() {
+export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const session = await auth();
 
   if (!isAdminEmail(session?.user?.email)) {
     redirect("/");
   }
+
+  const { tab = "overview" } = await searchParams;
+  const isTrolian = tab === "trolian";
+  const trolianCutoff = new Date("2026-04-16T00:00:00Z");
 
   const now = new Date();
   const day7Ago = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -119,20 +124,27 @@ export default async function AdminPage() {
     prisma.event.count({ where: { status: { in: ["UPCOMING", "LIVE"] } } }),
   ]);
 
-  const allTime = calcTicketStats(allTickets);
-  const last30d = calcTicketStats(allTickets.filter((t) => t.createdAt >= day30Ago));
-  const last7d = calcTicketStats(allTickets.filter((t) => t.createdAt >= day7Ago));
-  const goldTickets = calcTicketStats(allTickets.filter((t) => t.currency === "GOLD"));
-  const tcTickets = calcTicketStats(allTickets.filter((t) => t.currency === "TIBIA_COINS"));
+  const tickets = isTrolian ? allTickets.filter((t) => t.createdAt >= trolianCutoff) : allTickets;
+  const pvpBets = isTrolian ? allPvPBets.filter((b) => b.createdAt >= trolianCutoff) : allPvPBets;
 
-  const pvpGold = calcPvPStats(allPvPBets.filter((b) => b.currency === "GOLD"));
-  const pvpTc = calcPvPStats(allPvPBets.filter((b) => b.currency === "TIBIA_COINS"));
+  const allTime = calcTicketStats(tickets);
+  const last30d = calcTicketStats(tickets.filter((t) => t.createdAt >= day30Ago));
+  const last7d = calcTicketStats(tickets.filter((t) => t.createdAt >= day7Ago));
+  const goldTickets = calcTicketStats(tickets.filter((t) => t.currency === "GOLD"));
+  const tcTickets = calcTicketStats(tickets.filter((t) => t.currency === "TIBIA_COINS"));
+
+  const pvpGold = calcPvPStats(pvpBets.filter((b) => b.currency === "GOLD"));
+  const pvpTc = calcPvPStats(pvpBets.filter((b) => b.currency === "TIBIA_COINS"));
 
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-text-primary">House Dashboard</h1>
+        <div className="flex items-center gap-4">
+          <h1 className="text-2xl font-bold text-text-primary">House Dashboard</h1>
+          <AdminTabs />
+        </div>
         <span className="text-xs text-text-muted">
+          {isTrolian && <span className="text-gold mr-2">Since Apr 16</span>}
           {now.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}
         </span>
       </div>
@@ -167,22 +179,7 @@ export default async function AdminPage() {
         </StatGrid>
       </Section>
 
-      {/* Player Saldos */}
-      <Section title="Player Saldos">
-        <SaldoManager />
-      </Section>
-
-      {/* Ticket counts */}
-      <Section title="Ticket Breakdown">
-        <StatGrid cols={4}>
-          <Stat label="Lost (House Win)" value={String(allTime.counts.lost)} color="text-win" />
-          <Stat label="Won (House Loss)" value={String(allTime.counts.won)} color="text-loss" />
-          <Stat label="Pending" value={String(allTime.counts.pending)} color="text-gold" />
-          <Stat label="Void" value={String(allTime.counts.void)} color="text-text-muted" />
-        </StatGrid>
-      </Section>
-
-      {/* Pending exposure */}
+      {/* Current Exposure */}
       <Section title="Current Exposure">
         <StatGrid cols={3}>
           <Stat
@@ -203,6 +200,21 @@ export default async function AdminPage() {
             color="text-win"
             sub="total collected from lost tickets"
           />
+        </StatGrid>
+      </Section>
+
+      {/* Player Saldos */}
+      <Section title="Player Saldos">
+        <SaldoManager />
+      </Section>
+
+      {/* Ticket counts */}
+      <Section title="Ticket Breakdown">
+        <StatGrid cols={4}>
+          <Stat label="Lost (House Win)" value={String(allTime.counts.lost)} color="text-win" />
+          <Stat label="Won (House Loss)" value={String(allTime.counts.won)} color="text-loss" />
+          <Stat label="Pending" value={String(allTime.counts.pending)} color="text-gold" />
+          <Stat label="Void" value={String(allTime.counts.void)} color="text-text-muted" />
         </StatGrid>
       </Section>
 
