@@ -42,14 +42,14 @@ export default async function Home({
     }),
   ]);
 
-  // Merge and sort by settledAt descending
+  // Merge and sort by createdAt descending (latest placed on top)
   type HistoryItem =
     | { type: "pvp"; date: Date; data: PvPBetWithRelations }
     | { type: "ticket"; date: Date; data: TicketWithRelations };
 
   const feed: HistoryItem[] = [
-    ...pvpBets.map((b) => ({ type: "pvp" as const, date: b.settledAt ?? b.createdAt, data: b })),
-    ...tickets.map((t) => ({ type: "ticket" as const, date: t.settledAt ?? t.createdAt, data: t })),
+    ...pvpBets.map((b) => ({ type: "pvp" as const, date: b.createdAt, data: b })),
+    ...tickets.map((t) => ({ type: "ticket" as const, date: t.createdAt, data: t })),
   ].sort((a, b) => b.date.getTime() - a.date.getTime());
 
   const totalPages = Math.max(1, Math.ceil(feed.length / PAGE_SIZE));
@@ -269,6 +269,16 @@ function formatCET(date: Date) {
   }) + " CET";
 }
 
+function formatCETShort(date: Date) {
+  return date.toLocaleString("en-GB", {
+    timeZone: "Europe/Berlin",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function leagueLabel(sport: { name: string; key: string }) {
   return LEAGUE_LABELS[sport.key] ?? sport.name;
 }
@@ -433,7 +443,11 @@ function PvPCard({ bet }: { bet: PvPBetWithRelations }) {
           </span>
           <span className="uppercase tracking-wide text-[11px]">{leagueLabel(bet.event.sport)}</span>
         </div>
-        <span className="text-xs text-text-muted"><TimeAgo date={bet.createdAt} /></span>
+        <span className="text-xs text-text-muted" title={formatCET(bet.createdAt)}>
+          <TimeAgo date={bet.createdAt} />
+          <span className="opacity-50 mx-1">·</span>
+          {formatCETShort(bet.createdAt)}
+        </span>
       </div>
 
       {/* Players VS row */}
@@ -563,6 +577,12 @@ function TicketCard({ ticket }: { ticket: TicketWithRelations }) {
             Bet Slip
           </span>
           <PlayerAvatar name={ticket.user.name} alias={ticket.user.alias} image={ticket.user.image} />
+          <span className="opacity-50">·</span>
+          <span title={formatCET(ticket.createdAt)}>
+            <TimeAgo date={ticket.createdAt} />
+            <span className="opacity-50 mx-1">·</span>
+            {formatCETShort(ticket.createdAt)}
+          </span>
         </div>
         <div className="flex items-center gap-1.5">
           {ticket.status === "LOST" && (
