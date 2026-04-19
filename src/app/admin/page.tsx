@@ -1,6 +1,7 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
+import Image from "next/image";
 import SaldoManager from "@/components/SaldoManager";
 import { isAdminEmail } from "@/lib/admin";
 import AdminTabs from "@/components/AdminTabs";
@@ -152,11 +153,12 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       {/* Overview */}
       <Section title="Overview">
         <StatGrid>
-          <Stat
+          <CurrencyStat
             label="House Profit (all-time)"
-            value={fmt(allTime.houseProfit) + " gp"}
-            color={allTime.houseProfit >= 0 ? "text-win" : "text-loss"}
-            sub={allTime.houseProfit >= 0 ? "in the green" : "in the red"}
+            gold={goldTickets.houseProfit}
+            tc={tcTickets.houseProfit}
+            colorFn={(v) => (v >= 0 ? "text-win" : "text-loss")}
+            showSign
           />
           <Stat
             label="House Win Rate"
@@ -164,9 +166,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             color="text-text-primary"
             sub={`${allTime.counts.lost} won / ${allTime.counts.won} lost by house`}
           />
-          <Stat
+          <CurrencyStat
             label="Total Volume"
-            value={fmt(allTime.totalVolume) + " gp"}
+            gold={goldTickets.totalVolume}
+            tc={tcTickets.totalVolume}
             color="text-text-primary"
             sub="all settled + pending stakes"
           />
@@ -182,21 +185,24 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       {/* Current Exposure */}
       <Section title="Current Exposure">
         <StatGrid cols={3}>
-          <Stat
+          <CurrencyStat
             label="Pending Stakes"
-            value={fmt(allTime.pendingStakes) + " gp"}
+            gold={goldTickets.pendingStakes}
+            tc={tcTickets.pendingStakes}
             color="text-gold"
             sub="cash currently at risk"
           />
-          <Stat
+          <CurrencyStat
             label="Max Liability"
-            value={fmt(allTime.pendingExposure) + " gp"}
+            gold={goldTickets.pendingExposure}
+            tc={tcTickets.pendingExposure}
             color="text-loss"
             sub="additional payout if all pending win"
           />
-          <Stat
+          <CurrencyStat
             label="House Gains"
-            value={fmt(allTime.houseGains) + " gp"}
+            gold={goldTickets.houseGains}
+            tc={tcTickets.houseGains}
             color="text-win"
             sub="total collected from lost tickets"
           />
@@ -305,6 +311,55 @@ function Stat({ label, value, color, sub }: { label: string; value: string; colo
     <div className="rounded-xl border border-border/50 p-3 bg-bg-tertiary space-y-1">
       <p className="text-xs text-text-muted uppercase tracking-wide">{label}</p>
       <p className={`text-xl font-bold font-mono ${color}`}>{value}</p>
+      {sub && <p className="text-xs text-text-muted">{sub}</p>}
+    </div>
+  );
+}
+
+function CurrencyStat({
+  label,
+  gold,
+  tc,
+  color,
+  colorFn,
+  showSign,
+  sub,
+}: {
+  label: string;
+  gold: number;
+  tc: number;
+  color?: string;
+  colorFn?: (v: number) => string;
+  showSign?: boolean;
+  sub?: string;
+}) {
+  const renderRow = (value: number, src: string, alt: string) => {
+    const cls = colorFn ? colorFn(value) : color ?? "text-text-primary";
+    const prefix = showSign && value > 0 ? "+" : "";
+    return (
+      <div className="flex items-center gap-1.5">
+        <Image
+          src={src}
+          alt={alt}
+          width={14}
+          height={14}
+          className="inline-block shrink-0"
+          style={{ imageRendering: "pixelated" }}
+        />
+        <p className={`text-lg font-bold font-mono ${cls}`}>
+          {prefix}
+          {fmt(value)}
+        </p>
+      </div>
+    );
+  };
+  return (
+    <div className="rounded-xl border border-border/50 p-3 bg-bg-tertiary space-y-1.5">
+      <p className="text-xs text-text-muted uppercase tracking-wide">{label}</p>
+      <div className="space-y-0.5">
+        {renderRow(gold, "/tibia/crystal_coin.webp", "gp")}
+        {renderRow(tc, "/tibia/tibia_coin.webp", "TC")}
+      </div>
       {sub && <p className="text-xs text-text-muted">{sub}</p>}
     </div>
   );
