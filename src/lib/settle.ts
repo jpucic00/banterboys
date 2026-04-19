@@ -22,26 +22,31 @@ function doesPickWin(pick: Pick, homeScore: number, awayScore: number): boolean 
 
 export async function settlePvPBets(eventId: string) {
   const event = await prisma.event.findUnique({ where: { id: eventId } });
-  if (!event || event.status !== EventStatus.COMPLETED) return;
-  if (event.homeScore === null || event.awayScore === null) return;
+  if (!event) return;
+  const isCancelled = event.status === EventStatus.CANCELLED;
+  if (!isCancelled && event.status !== EventStatus.COMPLETED) return;
+  if (!isCancelled && (event.homeScore === null || event.awayScore === null)) return;
 
   const matchedBets = await prisma.pvPBet.findMany({
     where: { eventId, status: PvPBetStatus.MATCHED },
   });
 
   for (const bet of matchedBets) {
-    const creatorWon = doesPickWin(bet.pick, event.homeScore, event.awayScore);
-
     let status: PvPBetStatus;
-    if (bet.joinerPick) {
-      // New-style bet: three-way outcome
-      const acceptorWon = doesPickWin(bet.joinerPick, event.homeScore, event.awayScore);
-      if (creatorWon) status = PvPBetStatus.WON_CREATOR;
-      else if (acceptorWon) status = PvPBetStatus.WON_ACCEPTOR;
-      else status = PvPBetStatus.VOID;
+    if (isCancelled) {
+      status = PvPBetStatus.VOID;
     } else {
-      // Legacy bet: binary outcome
-      status = creatorWon ? PvPBetStatus.WON_CREATOR : PvPBetStatus.WON_ACCEPTOR;
+      const creatorWon = doesPickWin(bet.pick, event.homeScore!, event.awayScore!);
+      if (bet.joinerPick) {
+        // New-style bet: three-way outcome
+        const acceptorWon = doesPickWin(bet.joinerPick, event.homeScore!, event.awayScore!);
+        if (creatorWon) status = PvPBetStatus.WON_CREATOR;
+        else if (acceptorWon) status = PvPBetStatus.WON_ACCEPTOR;
+        else status = PvPBetStatus.VOID;
+      } else {
+        // Legacy bet: binary outcome
+        status = creatorWon ? PvPBetStatus.WON_CREATOR : PvPBetStatus.WON_ACCEPTOR;
+      }
     }
 
     await prisma.pvPBet.update({
@@ -74,8 +79,10 @@ export async function settlePvPBets(eventId: string) {
 
 export async function settleTicketSelections(eventId: string) {
   const event = await prisma.event.findUnique({ where: { id: eventId } });
-  if (!event || event.status !== EventStatus.COMPLETED) return;
-  if (event.homeScore === null || event.awayScore === null) return;
+  if (!event) return;
+  const isCancelled = event.status === EventStatus.CANCELLED;
+  if (!isCancelled && event.status !== EventStatus.COMPLETED) return;
+  if (!isCancelled && (event.homeScore === null || event.awayScore === null)) return;
 
   const selections = await prisma.ticketSelection.findMany({
     where: { eventId, result: SelectionResult.PENDING },
@@ -83,10 +90,16 @@ export async function settleTicketSelections(eventId: string) {
   });
 
   for (const sel of selections) {
-    const won = doesPickWin(sel.pick, event.homeScore!, event.awayScore!);
+    let result: SelectionResult;
+    if (isCancelled) {
+      result = SelectionResult.VOID;
+    } else {
+      const won = doesPickWin(sel.pick, event.homeScore!, event.awayScore!);
+      result = won ? SelectionResult.WON : SelectionResult.LOST;
+    }
     await prisma.ticketSelection.update({
       where: { id: sel.id },
-      data: { result: won ? SelectionResult.WON : SelectionResult.LOST },
+      data: { result },
     });
   }
 
@@ -136,7 +149,25 @@ export async function settleTicketSelections(eventId: string) {
     });
     if (count === 0) continue;
 
-    // Fetch ticket for saldo update and notification
+    // Recompute effective odds/payout when the ticket contains VOIDed legs: those
+    // legs drop out and the remaining (WON) picks define the true payout.
+    if (status === "WON") {
+      const hasVoids = allSelections.some((s) => s.result === SelectionResult.VOID);
+      if (hasVoids) {
+        const wonSelections = allSelections.filter((s) => s.result === SelectionResult.WON);
+        const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
+        if (ticket) {
+          const effectiveOdds = wonSelections.reduce((acc, s) => acc * s.odds, 1);
+          const effectivePayout = ticket.amount * effectiveOdds;
+          await prisma.ticket.update({
+            where: { id: ticketId },
+            data: { totalOdds: effectiveOdds, potentialPayout: effectivePayout },
+          });
+        }
+      }
+    }
+
+    // Fetch ticket for saldo update and notification (reads the recomputed values)
     const settled = await prisma.ticket.findUnique({
       where: { id: ticketId },
       include: {

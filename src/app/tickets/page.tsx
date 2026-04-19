@@ -256,13 +256,25 @@ function TicketCard({ ticket }: { ticket: any }) {
                       )}
                     </span>
                   )}
+                  {sel.event.status === "CANCELLED" && (
+                    <span className="text-[10px] font-bold text-text-muted">No Contest</span>
+                  )}
                   {sel.event.status === "COMPLETED" && sel.event.homeScore !== null && sel.event.awayScore !== null && (
-                    <span
-                      className="text-[10px] font-bold"
-                      style={{ color: sel.result === "WON" ? "#00c853" : sel.result === "LOST" ? "#ef4444" : "#888" }}
-                    >
-                      FT {sel.event.homeScore}–{sel.event.awayScore}
-                    </span>
+                    sel.event.sport.key === "mma_mixed_martial_arts" ? (
+                      <span
+                        className="text-[10px] font-bold"
+                        style={{ color: sel.result === "WON" ? "#00c853" : sel.result === "LOST" ? "#ef4444" : "#888" }}
+                      >
+                        Winner: {sel.event.homeScore > sel.event.awayScore ? sel.event.homeTeam : sel.event.awayTeam}
+                      </span>
+                    ) : (
+                      <span
+                        className="text-[10px] font-bold"
+                        style={{ color: sel.result === "WON" ? "#00c853" : sel.result === "LOST" ? "#ef4444" : "#888" }}
+                      >
+                        FT {sel.event.homeScore}–{sel.event.awayScore}
+                      </span>
+                    )
                   )}
                 </div>
                 <div className="text-text-primary font-medium mt-0.5">{pickLabel}</div>

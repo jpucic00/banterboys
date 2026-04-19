@@ -37,11 +37,13 @@ export interface EspnEvent {
   eventDate: Date;
   wentToExtraTime: boolean;
   statusDetail?: string; // e.g. "45:00 - 1st Half", "HT", "Q3 4:23", "Final"
+  winningSide?: "home" | "away" | null; // Used for sports where ESPN returns winner flags but no scores (e.g. MMA)
 }
 
 interface EspnCompetitor {
   homeAway?: "home" | "away";
   score: string;
+  winner?: boolean;
   team?: { displayName: string; abbreviation?: string; logo?: string };
   athlete?: { displayName: string };
 }
@@ -112,6 +114,8 @@ function parseEspnEvents(data: EspnScoreboardResponse, sportKey: string): EspnEv
       const home = comp.competitors.find((c) => c.homeAway === "home") ?? comp.competitors[0];
       const away = comp.competitors.find((c) => c.homeAway === "away") ?? comp.competitors[1];
       if (!home || !away) continue;
+      const winningSide: "home" | "away" | null =
+        home.winner ? "home" : away.winner ? "away" : null;
       results.push({
         id: isMultiFight ? comp.id : event.id,
         homeTeam: getCompetitorName(home),
@@ -127,6 +131,7 @@ function parseEspnEvents(data: EspnScoreboardResponse, sportKey: string): EspnEv
         eventDate: new Date(comp.date ?? event.date),
         wentToExtraTime: (isSoccerSport(sportKey) || sportKey === 'icehockey_nhl') && EXTRA_TIME_STATUSES.has(comp.status.type.name ?? ""),
         statusDetail: comp.status.type.shortDetail,
+        winningSide,
       });
 
       // For single-competition events, only process the first competition.

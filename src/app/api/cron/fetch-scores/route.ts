@@ -1,8 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import type { EspnEvent } from "@/lib/espn-api";
 import { ESPN_SPORT_MAP, fetchEspnEventsByDate, fetchEspnRecentEvents } from "@/lib/espn-api";
 import { settleEvent } from "@/lib/settle";
 import { EventStatus } from "@prisma/client";
+
+/**
+ * Map an ESPN completed event to final DB values. Handles:
+ * - MMA (ESPN returns no scores): synthesize 1-0 / 0-1 from the winner flag,
+ *   or mark CANCELLED with null scores for No Contest / Majority Draw.
+ * - Soccer / hockey extra time: force regulation-time draw (existing behavior).
+ * - Other team sports: round ESPN scores as-is.
+ */
+function resolveFinalScores(
+  sportKey: string,
+  espnEvent: EspnEvent,
+): { homeScore: number | null; awayScore: number | null; status: EventStatus } {
+  if (sportKey === "mma_mixed_martial_arts") {
+    if (espnEvent.winningSide === "home") return { homeScore: 1, awayScore: 0, status: EventStatus.COMPLETED };
+    if (espnEvent.winningSide === "away") return { homeScore: 0, awayScore: 1, status: EventStatus.COMPLETED };
+    return { homeScore: null, awayScore: null, status: EventStatus.CANCELLED };
+  }
+  let homeScore = Math.round(espnEvent.homeScore);
+  let awayScore = Math.round(espnEvent.awayScore);
+  if (espnEvent.wentToExtraTime) {
+    const drawScore = Math.min(homeScore, awayScore);
+    homeScore = drawScore;
+    awayScore = drawScore;
+  }
+  return { homeScore, awayScore, status: EventStatus.COMPLETED };
+}
 
 export async function GET(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get("secret");
@@ -71,25 +98,18 @@ async function runLiveScores() {
 
         if (espnEvent.completed) {
           // Settle just-completed events (same logic as sweep, but for today's active events)
-          if (event.status === EventStatus.COMPLETED) continue;
+          if (event.status === EventStatus.COMPLETED || event.status === EventStatus.CANCELLED) continue;
 
-          let homeScore = Math.round(espnEvent.homeScore);
-          let awayScore = Math.round(espnEvent.awayScore);
-          if (espnEvent.wentToExtraTime) {
-            const drawScore = Math.min(homeScore, awayScore);
-            homeScore = drawScore;
-            awayScore = drawScore;
-          }
-
+          const resolved = resolveFinalScores(sportKey, espnEvent);
           await prisma.event.update({
             where: { id: event.id },
             data: {
-              homeScore,
-              awayScore,
+              homeScore: resolved.homeScore,
+              awayScore: resolved.awayScore,
               liveHomeScore: null,
               liveAwayScore: null,
               liveClock: null,
-              status: EventStatus.COMPLETED,
+              status: resolved.status,
               completedAt: new Date(),
             },
           });
@@ -148,25 +168,18 @@ async function runSettlementSweep() {
         const event = await prisma.event.findUnique({
           where: { espnEventId: espnEvent.id },
         });
-        if (!event || event.status === EventStatus.COMPLETED) continue;
+        if (!event || event.status === EventStatus.COMPLETED || event.status === EventStatus.CANCELLED) continue;
 
-        let homeScore = Math.round(espnEvent.homeScore);
-        let awayScore = Math.round(espnEvent.awayScore);
-        if (espnEvent.wentToExtraTime) {
-          const drawScore = Math.min(homeScore, awayScore);
-          homeScore = drawScore;
-          awayScore = drawScore;
-        }
-
+        const resolved = resolveFinalScores(sportKey, espnEvent);
         await prisma.event.update({
           where: { id: event.id },
           data: {
-            homeScore,
-            awayScore,
+            homeScore: resolved.homeScore,
+            awayScore: resolved.awayScore,
             liveHomeScore: null,
             liveAwayScore: null,
             liveClock: null,
-            status: EventStatus.COMPLETED,
+            status: resolved.status,
             completedAt: new Date(),
           },
         });

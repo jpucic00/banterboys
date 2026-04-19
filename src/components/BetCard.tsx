@@ -278,13 +278,26 @@ export default function BetCard({ bet, onJoin, onCancel }: BetCardProps) {
               <span className="text-text-muted">{bet.event.liveClock}</span>
             )}
           </div>
-        ) : bet.event.status === "COMPLETED" && bet.event.homeScore !== null && bet.event.awayScore !== null ? (
+        ) : bet.event.status === "CANCELLED" ? (
           <div className="flex items-center gap-1.5 text-[11px] mt-0.5">
-            <span className="text-text-muted">FT</span>
-            <span className="font-bold text-text-secondary">
-              {bet.event.homeScore} – {bet.event.awayScore}
-            </span>
+            <span className="font-bold text-text-muted">No Contest</span>
           </div>
+        ) : bet.event.status === "COMPLETED" && bet.event.homeScore !== null && bet.event.awayScore !== null ? (
+          bet.event.sport.key === "mma_mixed_martial_arts" ? (
+            <div className="flex items-center gap-1.5 text-[11px] mt-0.5">
+              <span className="text-text-muted">Winner:</span>
+              <span className="font-bold text-text-secondary">
+                {bet.event.homeScore > bet.event.awayScore ? bet.event.homeTeam : bet.event.awayTeam}
+              </span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 text-[11px] mt-0.5">
+              <span className="text-text-muted">FT</span>
+              <span className="font-bold text-text-secondary">
+                {bet.event.homeScore} – {bet.event.awayScore}
+              </span>
+            </div>
+          )
         ) : (
           <div className="text-[11px] text-text-muted mt-0.5">
             {formatCET(bet.event.commenceTime)}
