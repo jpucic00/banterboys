@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { EventStatus } from "@prisma/client";
-import { notifyTicketCreated } from "@/lib/discord-notify";
+import { EventStatus, TicketStatus } from "@prisma/client";
+import { notifyTicketCreated, notifyTicketCancelled } from "@/lib/discord-notify";
 import { adjustSaldo } from "@/lib/saldo";
+import { isAdminEmail } from "@/lib/admin";
 
 export async function GET() {
   const session = await auth();
@@ -118,4 +119,42 @@ export async function POST(req: NextRequest) {
   await adjustSaldo(session.user.id, currency || "GOLD", -parseFloat(amount));
   notifyTicketCreated(ticket, session.user).catch(() => {});
   return NextResponse.json(ticket, { status: 201 });
+}
+
+export async function PATCH(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  if (!isAdminEmail(session.user.email)) {
+    return NextResponse.json({ error: "Admins only" }, { status: 403 });
+  }
+
+  const body = await req.json();
+  const { ticketId, action } = body;
+
+  if (action !== "cancel") {
+    return NextResponse.json({ error: "Invalid action" }, { status: 400 });
+  }
+
+  const ticket = await prisma.ticket.findUnique({ where: { id: ticketId } });
+  if (!ticket || ticket.status !== TicketStatus.PENDING) {
+    return NextResponse.json(
+      { error: "Ticket cannot be cancelled" },
+      { status: 400 }
+    );
+  }
+
+  const updated = await prisma.ticket.update({
+    where: { id: ticketId },
+    data: { status: TicketStatus.VOID, settledAt: new Date() },
+    include: {
+      selections: { include: { event: { include: { sport: true } } } },
+      user: { select: { id: true, name: true, image: true } },
+    },
+  });
+
+  await adjustSaldo(ticket.userId, ticket.currency, ticket.amount);
+  notifyTicketCancelled(updated).catch(() => {});
+  return NextResponse.json(updated);
 }

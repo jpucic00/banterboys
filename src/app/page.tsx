@@ -4,6 +4,9 @@ import Image from "next/image";
 import { CoinAmount } from "@/components/CoinIcon";
 import JoinBetButton from "@/components/JoinBetButton";
 import OverviewFilterButtons from "@/components/OverviewFilterButtons";
+import CancelTicketButton from "@/components/CancelTicketButton";
+import { auth } from "@/lib/auth";
+import { isAdminEmail } from "@/lib/admin";
 import { Suspense } from "react";
 import { PvPBetStatus, TicketStatus } from "@prisma/client";
 
@@ -21,6 +24,9 @@ export default async function Home({
   const { filter: filterParam, page: pageParam } = await searchParams;
   const filter = filterParam === "all" ? "all" : "active";
   const requestedPage = Math.max(1, Number(pageParam) || 1);
+
+  const session = await auth();
+  const isAdmin = isAdminEmail(session?.user?.email);
 
   const [pvpBets, tickets] = await Promise.all([
     prisma.pvPBet.findMany({
@@ -142,7 +148,7 @@ export default async function Home({
             item.type === "pvp" ? (
               <PvPCard key={`pvp-${item.data.id}`} bet={item.data} />
             ) : (
-              <TicketCard key={`ticket-${item.data.id}`} ticket={item.data} />
+              <TicketCard key={`ticket-${item.data.id}`} ticket={item.data} isAdmin={isAdmin} />
             )
           )}
         </div>
@@ -151,7 +157,7 @@ export default async function Home({
         <div className="hidden md:grid md:grid-cols-2 gap-4 items-start">
           <div className="space-y-4">
             {pageFeed.filter((item) => item.type === "ticket").map((item) => (
-              <TicketCard key={`ticket-${item.data.id}`} ticket={item.data as TicketWithRelations} />
+              <TicketCard key={`ticket-${item.data.id}`} ticket={item.data as TicketWithRelations} isAdmin={isAdmin} />
             ))}
             {pageFeed.filter((item) => item.type === "ticket").length === 0 && (
               <p className="text-text-muted text-sm text-center py-6">No bet slips.</p>
@@ -562,7 +568,8 @@ type TicketWithRelations = {
   }[];
 };
 
-function TicketCard({ ticket }: { ticket: TicketWithRelations }) {
+function TicketCard({ ticket, isAdmin }: { ticket: TicketWithRelations; isAdmin: boolean }) {
+  const canCancel = isAdmin && ticket.status === "PENDING";
   return (
     <div
       className="rounded-md border border-border overflow-hidden"
@@ -592,6 +599,7 @@ function TicketCard({ ticket }: { ticket: TicketWithRelations }) {
           <span className="text-xs font-medium uppercase tracking-wide" style={{ color: ticketStatusColor(ticket.status) }}>
             {ticket.status}
           </span>
+          {canCancel && <CancelTicketButton ticketId={ticket.id} />}
         </div>
       </div>
 
