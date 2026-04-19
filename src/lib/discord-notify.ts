@@ -403,6 +403,93 @@ export async function notifyTicketCreated(
   });
 }
 
+export async function notifyTicketCancelled(ticket: {
+  amount: number;
+  currency: "GOLD" | "TIBIA_COINS";
+  user: { name?: string | null; alias?: string | null };
+  selections: Array<{
+    pick: string;
+    event: { homeTeam: string; awayTeam: string };
+  }>;
+}): Promise<void> {
+  const userName = displayName(ticket.user);
+  const legs = ticket.selections
+    .map(
+      (s, i) =>
+        `\`${i + 1}.\` **${pickLabel(s.pick)}** — ${s.event.homeTeam} vs ${s.event.awayTeam}`
+    )
+    .join("\n");
+
+  await sendWebhook({
+    embeds: [
+      {
+        title: "🚫 Bet Slip Cancelled",
+        description: `**${userName}**'s bet slip has been cancelled by an admin. The stake has been refunded.${siteLink("slip")}`,
+        color: COLORS.red,
+        fields: [
+          { name: "🧑 Player", value: userName, inline: true },
+          {
+            name: "🔗 Legs",
+            value: String(ticket.selections.length),
+            inline: true,
+          },
+          {
+            name: "💰 Stake Returned",
+            value: formatCurrency(ticket.amount, ticket.currency),
+            inline: true,
+          },
+          { name: "🎯 Selections", value: legs, inline: false },
+        ],
+        footer: { text: "Banter Boys Betting" },
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  });
+}
+
+type SaldoUser = {
+  alias: string | null;
+  discordId: string | null;
+  saldoGold: number;
+  saldoTibiaCoins: number;
+};
+
+function formatSaldoLine(u: SaldoUser, sign: "pos" | "neg"): string {
+  const tag = u.discordId ? `<@${u.discordId}>` : `**${u.alias ?? "Unknown"}**`;
+  const gold = sign === "pos" ? Math.max(u.saldoGold, 0) : Math.min(u.saldoGold, 0);
+  const tc = sign === "pos" ? Math.max(u.saldoTibiaCoins, 0) : Math.min(u.saldoTibiaCoins, 0);
+  const parts: string[] = [];
+  if (gold !== 0) parts.push(`${Math.round(Math.abs(gold)).toLocaleString()} gp`);
+  if (tc !== 0) parts.push(`${Math.round(Math.abs(tc)).toLocaleString()} TC`);
+  return `${tag} — ${parts.join(", ")}`;
+}
+
+export async function notifySaldoSummary(users: SaldoUser[]): Promise<void> {
+  const houseOwes = users.filter((u) => u.saldoGold > 0 || u.saldoTibiaCoins > 0);
+  const owesHouse = users.filter((u) => u.saldoGold < 0 || u.saldoTibiaCoins < 0);
+
+  if (houseOwes.length === 0 && owesHouse.length === 0) return;
+
+  const sections: string[] = [];
+  if (owesHouse.length) {
+    const lines = owesHouse.map((u) => formatSaldoLine(u, "neg")).join("\n");
+    sections.push(`💰 **Owed to the House** — please transfer to a house admin\n${lines}`);
+  }
+  if (houseOwes.length) {
+    const lines = houseOwes.map((u) => formatSaldoLine(u, "pos")).join("\n");
+    sections.push(`💸 **Owed by the House** — a house admin will transfer to you\n${lines}`);
+  }
+
+  const userIds = users
+    .map((u) => u.discordId)
+    .filter((id): id is string => !!id);
+
+  await sendWebhook({
+    content: `🧾 **Saldo Summary**\n\n${sections.join("\n\n")}`,
+    allowed_mentions: { parse: [], users: userIds },
+  });
+}
+
 export async function notifyTicketSettled(
   ticket: {
     amount: number;

@@ -18,6 +18,8 @@ export default function SaldoManager() {
   const [error, setError] = useState<string | null>(null);
   const [adjustInputs, setAdjustInputs] = useState<Record<string, { gold: string; tc: string }>>({});
   const [copied, setCopied] = useState<string | null>(null);
+  const [notifyState, setNotifyState] = useState<"idle" | "sending" | "sent" | "error">("idle");
+  const [notifyMessage, setNotifyMessage] = useState<string | null>(null);
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -85,6 +87,40 @@ export default function SaldoManager() {
     }
   }
 
+  async function handleSendDiscordSummary() {
+    const nonZero = users.filter((u) => u.saldoGold !== 0 || u.saldoTibiaCoins !== 0);
+    if (nonZero.length === 0) {
+      setNotifyState("error");
+      setNotifyMessage("No outstanding saldos to send");
+      setTimeout(() => setNotifyState("idle"), 3000);
+      return;
+    }
+    if (
+      !confirm(
+        `Send saldo summary to Discord? This will mention ${nonZero.length} player${nonZero.length === 1 ? "" : "s"}.`
+      )
+    ) {
+      return;
+    }
+    setNotifyState("sending");
+    setNotifyMessage(null);
+    try {
+      const res = await fetch("/api/admin/saldo/notify", { method: "POST" });
+      const data = await res.json();
+      if (!res.ok) {
+        setNotifyState("error");
+        setNotifyMessage(data.error ?? `Failed (${res.status})`);
+      } else {
+        setNotifyState("sent");
+        setNotifyMessage(`Sent — ${data.count} player${data.count === 1 ? "" : "s"} mentioned`);
+      }
+    } catch {
+      setNotifyState("error");
+      setNotifyMessage("Network error");
+    }
+    setTimeout(() => setNotifyState("idle"), 4000);
+  }
+
   function copyPayoutText(alias: string, amount: number) {
     const text = `Transfer ${Math.abs(Math.round(amount))} to ${alias}`;
     navigator.clipboard.writeText(text);
@@ -104,8 +140,33 @@ export default function SaldoManager() {
     return <p className="text-text-muted text-sm">No players found</p>;
   }
 
+  const outstandingCount = users.filter(
+    (u) => u.saldoGold !== 0 || u.saldoTibiaCoins !== 0
+  ).length;
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          onClick={handleSendDiscordSummary}
+          disabled={notifyState === "sending" || outstandingCount === 0}
+          className="px-3 py-1.5 text-xs rounded-lg bg-info/10 border border-info/30 text-info hover:bg-info/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+        >
+          {notifyState === "sending"
+            ? "Sending..."
+            : `Send Saldo Summary to Discord (${outstandingCount})`}
+        </button>
+        {notifyMessage && (
+          <span
+            className={`text-xs ${
+              notifyState === "error" ? "text-loss" : "text-win"
+            }`}
+          >
+            {notifyMessage}
+          </span>
+        )}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
       {users.map((user) => (
         <div
           key={user.id}
@@ -176,6 +237,7 @@ export default function SaldoManager() {
           />
         </div>
       ))}
+      </div>
     </div>
   );
 }
