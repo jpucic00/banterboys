@@ -210,7 +210,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       </Section>
 
       {/* Player Saldos */}
-      <Section title="Player Saldos">
+      <Section title="Player Balances">
         <SaldoManager />
       </Section>
 

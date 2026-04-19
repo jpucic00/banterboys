@@ -91,13 +91,13 @@ export default function SaldoManager() {
     const nonZero = users.filter((u) => u.saldoGold !== 0 || u.saldoTibiaCoins !== 0);
     if (nonZero.length === 0) {
       setNotifyState("error");
-      setNotifyMessage("No outstanding saldos to send");
+      setNotifyMessage("No outstanding balances to send");
       setTimeout(() => setNotifyState("idle"), 3000);
       return;
     }
     if (
       !confirm(
-        `Send saldo summary to Discord? This will mention ${nonZero.length} player${nonZero.length === 1 ? "" : "s"}.`
+        `Send balance summary to Discord? This will mention ${nonZero.length} player${nonZero.length === 1 ? "" : "s"}.`
       )
     ) {
       return;
@@ -129,7 +129,7 @@ export default function SaldoManager() {
   }
 
   if (loading) {
-    return <p className="text-text-muted text-sm">Loading saldos...</p>;
+    return <p className="text-text-muted text-sm">Loading balances...</p>;
   }
 
   if (error) {
@@ -154,7 +154,7 @@ export default function SaldoManager() {
         >
           {notifyState === "sending"
             ? "Sending..."
-            : `Send Saldo Summary to Discord (${outstandingCount})`}
+            : `Send Balance Summary to Discord (${outstandingCount})`}
         </button>
         {notifyMessage && (
           <span

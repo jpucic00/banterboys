@@ -485,7 +485,7 @@ export async function notifySaldoSummary(users: SaldoUser[]): Promise<void> {
     .filter((id): id is string => !!id);
 
   await sendWebhook({
-    content: `🧾 **Saldo Summary**\n\n${sections.join("\n\n")}`,
+    content: `🧾 **Balance Summary**\n\n${sections.join("\n\n")}`,
     allowed_mentions: { parse: [], users: userIds },
   });
 }
