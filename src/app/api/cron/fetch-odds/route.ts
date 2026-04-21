@@ -39,7 +39,17 @@ export async function GET(req: NextRequest) {
           },
         });
 
-        const bookmaker = apiEvent.bookmakers[0];
+        // Prefer a bookmaker whose h2h market carries a 3-way outcome (Home/Draw/Away).
+        // Soccer h2h is already 3-way everywhere. NHL h2h is 2-way for most bookmakers but
+        // ~17 EU/UK books (marathonbet, unibet_*, leovegas, betway, …) quote regulation-time
+        // 3-way under the same h2h key; we pick one of those when available so draw/1X/2X
+        // match our regulation-time settlement. Falls back to the first bookmaker otherwise.
+        const bookmaker =
+          apiEvent.bookmakers.find((b) =>
+            b.markets.some(
+              (m) => m.key === "h2h" && m.outcomes.some((o) => o.name === "Draw")
+            )
+          ) ?? apiEvent.bookmakers[0];
         if (bookmaker) {
           const h2h = bookmaker.markets.find((m) => m.key === "h2h");
           if (h2h) {

@@ -8,6 +8,7 @@ const SPORT_KEYS = [
   "soccer_spain_la_liga",
   "soccer_germany_bundesliga",
   "soccer_italy_serie_a",
+  "soccer_italy_coppa_italia",
   "soccer_uefa_champs_league",
   "soccer_uefa_europa_league",
   "soccer_uefa_europa_conference_league",
