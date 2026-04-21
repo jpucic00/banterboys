@@ -13,6 +13,7 @@ import {
   PAYTABLE,
   STAKE_LIMITS,
   BIG_WIN_MULTIPLIER,
+  MAX_SLOT_DEBT,
 } from "@/lib/slots";
 
 type SpinUser = {
@@ -92,13 +93,17 @@ export default function SlotsMachine({
     setBalance(initialSaldo.saldoTibiaCoins);
   }, [initialSaldo.saldoTibiaCoins]);
 
+  const worstCaseBalance = balance - stake;
+  const debtLimitHit = isLoggedIn && worstCaseBalance < -MAX_SLOT_DEBT;
+
   const canSpin =
     isLoggedIn &&
     !spinning &&
     stake >= STAKE_LIMITS.TIBIA_COINS.min &&
-    stake <= STAKE_LIMITS.TIBIA_COINS.max;
+    stake <= STAKE_LIMITS.TIBIA_COINS.max &&
+    !debtLimitHit;
 
-  const willGoNegative = isLoggedIn && balance - stake < 0;
+  const willGoNegative = isLoggedIn && worstCaseBalance < 0 && !debtLimitHit;
 
   async function handleSpin() {
     if (!canSpin) return;
@@ -428,6 +433,15 @@ export default function SlotsMachine({
             style={{ color: "#ef4444" }}
           >
             {error}
+          </p>
+        )}
+        {debtLimitHit && (
+          <p
+            className="text-center text-xs mt-3 font-medium"
+            style={{ color: "#ef4444" }}
+          >
+            Debt limit reached ({MAX_SLOT_DEBT} TC). Settle with the house to
+            keep playing.
           </p>
         )}
         {willGoNegative && (

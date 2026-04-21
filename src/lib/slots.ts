@@ -124,3 +124,7 @@ export const STAKE_LIMITS = {
 
 export const BIG_WIN_MULTIPLIER = 10; // UI tier: green cabinet + green chip
 export const DISCORD_NOTIFY_MULTIPLIER = 20; // >= this triggers a Discord webhook
+
+// Max Tibia Coin debt a player is allowed to carry FROM SLOTS. If a spin would
+// push saldoTibiaCoins below -MAX_SLOT_DEBT, the server rejects it.
+export const MAX_SLOT_DEBT = 500;

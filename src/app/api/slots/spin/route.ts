@@ -7,6 +7,7 @@ import {
   resolveSpin,
   STAKE_LIMITS,
   DISCORD_NOTIFY_MULTIPLIER,
+  MAX_SLOT_DEBT,
 } from "@/lib/slots";
 import { checkSlotThrottle } from "@/lib/slots-rate-limit";
 import { notifySlotWin } from "@/lib/discord-notify";
@@ -72,13 +73,19 @@ export async function POST(req: NextRequest) {
 
   try {
     const { newBalance, spinId } = await prisma.$transaction(async (tx) => {
-      // Confirm user still exists. Balance is allowed to go negative —
-      // house tracks the debt via saldo until it's paid off in-game.
+      // Balance is allowed to go negative — house tracks the debt via saldo
+      // until it's paid off in-game. But cap the slot-side debt at MAX_SLOT_DEBT
+      // so losses can't spiral indefinitely.
       const user = await tx.user.findUnique({
         where: { id: userId },
-        select: { id: true },
+        select: { saldoTibiaCoins: true },
       });
       if (!user) throw new Error("USER_NOT_FOUND");
+
+      // Worst case: the spin loses and net = -stake. Check against debt cap.
+      if (user.saldoTibiaCoins - stake < -MAX_SLOT_DEBT) {
+        throw new Error("DEBT_LIMIT");
+      }
 
       const updated = await tx.user.update({
         where: { id: userId },
@@ -128,6 +135,14 @@ export async function POST(req: NextRequest) {
     const msg = err instanceof Error ? err.message : "Unknown";
     if (msg === "USER_NOT_FOUND") {
       return NextResponse.json({ error: "User not found." }, { status: 404 });
+    }
+    if (msg === "DEBT_LIMIT") {
+      return NextResponse.json(
+        {
+          error: `Slot debt limit reached (${MAX_SLOT_DEBT} TC). Settle with the house to keep playing.`,
+        },
+        { status: 400 }
+      );
     }
     console.error("[slots/spin]", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
