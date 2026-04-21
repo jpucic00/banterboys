@@ -182,10 +182,7 @@ export default function SlotsMachine({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-white uppercase tracking-wide">
-            Tibia Slots
-          </h1>
-          <p className="text-text-muted text-xs mt-0.5">
+          <p className="text-text-muted text-xs">
             Match 3 symbols for big payouts. Tibia Coins only.
           </p>
         </div>
