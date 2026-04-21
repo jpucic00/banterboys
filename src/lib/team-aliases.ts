@@ -5,8 +5,8 @@
  * comparison for sports with a fixed, finite set of teams.
  *
  * Coverage: basketball_nba, soccer_epl, soccer_spain_la_liga, soccer_germany_bundesliga,
- *           soccer_italy_serie_a, soccer_netherlands_eredivisie, soccer_france_ligue_one,
- *           soccer_brazil_campeonato,
+ *           soccer_italy_serie_a, soccer_italy_coppa_italia, soccer_netherlands_eredivisie,
+ *           soccer_france_ligue_one, soccer_brazil_campeonato,
  *           icehockey_nhl, soccer_uefa_champs_league, soccer_conmebol_copa_libertadores (partial),
  *           soccer_fifa_world_cup (partial — only teams with known Odds API ↔ ESPN name divergence).
  *
@@ -207,6 +207,54 @@ export const ODDS_TO_ESPN_ABBREV: Record<string, Record<string, string>> = {
   },
 
   soccer_italy_serie_a: {
+    "Juventus": "JUV",
+    "AC Milan": "MIL",
+    "Milan": "MIL",
+    "Inter Milan": "INT",
+    "Internazionale": "INT",
+    "Inter": "INT",
+    "Napoli": "NAP",
+    "SSC Napoli": "NAP",
+    "AS Roma": "ROMA",
+    "Roma": "ROMA",
+    "SS Lazio": "LAZ",
+    "Lazio": "LAZ",
+    "Atalanta": "ATA",
+    "Atalanta BC": "ATA",
+    "ACF Fiorentina": "FIO",
+    "Fiorentina": "FIO",
+    "Bologna": "BOL",
+    "Bologna FC": "BOL",
+    "Torino": "TOR",
+    "Torino FC": "TOR",
+    "Udinese": "UDI",
+    "Udinese Calcio": "UDI",
+    "Empoli": "EMP",
+    "Cagliari": "CAG",
+    "Hellas Verona": "VER",
+    "Verona": "VER",
+    "Lecce": "LEC",
+    "US Lecce": "LEC",
+    "Monza": "MON",
+    "AC Monza": "MON",
+    "Parma": "PAR",
+    "Parma Calcio": "PAR",
+    "Venezia": "VEN",
+    "Venezia FC": "VEN",
+    "Como": "COMO",
+    "Como 1907": "COMO",
+    "Genoa": "GEN",
+    "Genoa CFC": "GEN",
+    "Sassuolo": "SAS",
+    "US Sassuolo": "SAS",
+    "Salernitana": "SAL",
+    "Frosinone": "FRO",
+  },
+
+  // Coppa Italia reuses the Italian club abbreviations from Serie A (ESPN uses the
+  // same abbreviations across competitions). Serie B clubs that enter in earlier
+  // rounds fall through to fuzzy matching.
+  soccer_italy_coppa_italia: {
     "Juventus": "JUV",
     "AC Milan": "MIL",
     "Milan": "MIL",
@@ -456,6 +504,9 @@ export const ODDS_TO_ESPN_ABBREV: Record<string, Record<string, string>> = {
     "Libertad Asuncion": "LIB",
     "Libertad": "LIB",
     "Mirassol": "MIR",
+    "Lanus": "LAN",
+    "Lanús": "LAN",
+    "Rosario Central": "ROS",
   },
 
   // World Cup: only entries where Odds API name diverges from ESPN displayName.

@@ -55,6 +55,7 @@ const LEAGUE_LABELS: Record<string, string> = {
   soccer_germany_bundesliga:            "Bundesliga",
   soccer_france_ligue_one:              "Ligue 1",
   soccer_italy_serie_a:                 "Serie A",
+  soccer_italy_coppa_italia:            "Coppa Italia",
   soccer_netherlands_eredivisie:        "Eredivisie",
   soccer_portugal_primeira_liga:        "Primeira Liga",
   soccer_uefa_champs_league:            "Champions League",
