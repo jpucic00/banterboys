@@ -49,3 +49,77 @@ body {
   background-color: var(--color-bg-primary);
   color: var(--color-text-primary);
 }
+
+/* ─── Slots animations ───────────────────────────────────────────── */
+
+@keyframes slots-symbol-pulse {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgba(0, 200, 83, 0));
+  }
+  50% {
+    transform: scale(1.18);
+    filter: drop-shadow(0 0 12px rgba(0, 200, 83, 0.9));
+  }
+}
+
+@keyframes slots-symbol-pulse-jackpot {
+  0%, 100% {
+    transform: scale(1);
+    filter: drop-shadow(0 0 0 rgba(240, 168, 24, 0));
+  }
+  25% {
+    transform: scale(1.28);
+    filter: drop-shadow(0 0 22px rgba(240, 168, 24, 1));
+  }
+  75% {
+    transform: scale(1.15);
+    filter: drop-shadow(0 0 16px rgba(255, 208, 68, 1));
+  }
+}
+
+@keyframes slots-coin-fall {
+  0% {
+    transform: translateY(-30px) rotate(0deg);
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  92% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(320px) rotate(720deg);
+    opacity: 0;
+  }
+}
+
+@keyframes slots-cabinet-shake {
+  0%, 100% { transform: translate3d(0, 0, 0); }
+  10%, 30%, 50%, 70%, 90% { transform: translate3d(-3px, 0, 0); }
+  20%, 40%, 60%, 80% { transform: translate3d(3px, 0, 0); }
+}
+
+@keyframes slots-cabinet-flash {
+  0% {
+    box-shadow:
+      inset 0 0 60px rgba(240, 168, 24, 0.9),
+      0 0 80px rgba(240, 168, 24, 0.6);
+  }
+  100% {
+    box-shadow: inset 0 1px 0 rgba(168, 85, 247, 0.25), 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
+}
+
+@keyframes slots-banner-pop {
+  0% { transform: scale(0.3); opacity: 0; }
+  60% { transform: scale(1.12); opacity: 1; }
+  80% { transform: scale(0.95); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes slots-payline-flash {
+  0%   { filter: brightness(2.5) saturate(2); }
+  100% { filter: brightness(1) saturate(1); }
+}

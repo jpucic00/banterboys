@@ -92,39 +92,40 @@ model VerificationToken {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  name          String?
-  alias         String?   @unique
-  email         String?   @unique
-  emailVerified DateTime?
-  image         String?
-  role          UserRole  @default(USER)
-  createdAt     DateTime  @default(now())
-  saldoGold       Float   @default(0)
-  saldoTibiaCoins Float   @default(0)
+  id              String    @id @default(cuid())
+  name            String?
+  alias           String?   @unique
+  email           String?   @unique
+  emailVerified   DateTime?
+  image           String?
+  role            UserRole  @default(USER)
+  createdAt       DateTime  @default(now())
+  saldoGold       Float     @default(0)
+  saldoTibiaCoins Float     @default(0)
 
-  accounts       Account[]
-  sessions       Session[]
-  createdBets    PvPBet[]  @relation("BetCreator")
-  acceptedBets   PvPBet[]  @relation("BetAcceptor")
-  tickets        Ticket[]
+  accounts     Account[]
+  sessions     Session[]
+  createdBets  PvPBet[]   @relation("BetCreator")
+  acceptedBets PvPBet[]   @relation("BetAcceptor")
+  tickets      Ticket[]
+  slotSpins    SlotSpin[]
 }
 
 model Sport {
   id     String  @id @default(cuid())
   key    String  @unique // e.g. "basketball_nba"
-  name   String           // e.g. "NBA"
+  name   String // e.g. "NBA"
   active Boolean @default(true)
   events Event[]
 }
 
 model Event {
-  id           String      @id @default(cuid())
-  apiEventId   String      @unique
-  sportId      String
-  homeTeam     String
-  awayTeam     String
-  commenceTime DateTime
+  id            String      @id @default(cuid())
+  apiEventId    String      @unique
+  sportId       String
+  homeTeam      String
+  awayTeam      String
+  commenceTime  DateTime
   homeScore     Int?
   awayScore     Int?
   liveHomeScore Int?
@@ -135,9 +136,9 @@ model Event {
   espnEventId   String?     @unique
   homeLogoUrl   String?
   awayLogoUrl   String?
-  updatedAt    DateTime    @updatedAt
+  updatedAt     DateTime    @updatedAt
 
-  sport      Sport           @relation(fields: [sportId], references: [id])
+  sport      Sport             @relation(fields: [sportId], references: [id])
   odds       OddsSnapshot[]
   pvpBets    PvPBet[]
   selections TicketSelection[]
@@ -163,19 +164,19 @@ model OddsSnapshot {
 }
 
 model PvPBet {
-  id         String       @id @default(cuid())
-  creatorId  String
-  acceptorId String?
-  eventId    String
+  id           String       @id @default(cuid())
+  creatorId    String
+  acceptorId   String?
+  eventId      String
   pick         Pick
   amount       Float
   odds         Float
   joinerPick   Pick?
   joinerAmount Float?
   currency     Currency     @default(GOLD)
-  status     PvPBetStatus @default(OPEN)
-  createdAt  DateTime     @default(now())
-  settledAt  DateTime?
+  status       PvPBetStatus @default(OPEN)
+  createdAt    DateTime     @default(now())
+  settledAt    DateTime?
 
   creator  User  @relation("BetCreator", fields: [creatorId], references: [id])
   acceptor User? @relation("BetAcceptor", fields: [acceptorId], references: [id])
@@ -216,4 +217,21 @@ model TicketSelection {
 
   @@index([ticketId])
   @@index([eventId])
+}
+
+model SlotSpin {
+  id         String   @id @default(cuid())
+  userId     String
+  currency   Currency
+  stake      Float
+  payout     Float    @default(0) // 0 on loss
+  symbols    String // e.g. "dragon,dragon,snake"
+  multiplier Float    @default(0) // payout / stake; convenience for analytics
+  createdAt  DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
+  @@index([multiplier])
 }

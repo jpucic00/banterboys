@@ -5,6 +5,7 @@ import SaldoManager from "@/components/SaldoManager";
 import { isAdminEmail } from "@/lib/admin";
 import AdminTabs from "@/components/AdminTabs";
 import { Section, StatGrid, Stat, CurrencyStat, fmtStat as fmt } from "@/components/StatCards";
+import { DISCORD_NOTIFY_MULTIPLIER } from "@/lib/slots";
 
 export const dynamic = "force-dynamic";
 
@@ -48,6 +49,29 @@ type PvPStats = {
   };
 };
 
+type SlotRow = {
+  stake: number;
+  payout: number;
+  multiplier: number;
+  symbols: string;
+  createdAt: Date;
+};
+
+type SlotStats = {
+  houseProfit: number;       // sum(stake) - sum(payout)
+  totalVolume: number;       // sum(stake)
+  totalPayouts: number;      // sum(payout)
+  spinCount: number;
+  winCount: number;          // spins with payout > 0
+  jackpotCount: number;      // 3x ferumbras
+  bigWinCount: number;       // multiplier >= BIG_WIN_MULTIPLIER (Discord threshold)
+  biggestMultiplier: number;
+  biggestPayout: number;
+  avgStake: number;
+  hitRate: number | null;    // winCount / spinCount (percent)
+  actualRTP: number | null;  // totalPayouts / totalVolume (percent)
+};
+
 function calcTicketStats(tickets: TicketRow[]): TicketStats {
   const won = tickets.filter((t) => t.status === "WON");
   const lost = tickets.filter((t) => t.status === "LOST");
@@ -72,6 +96,32 @@ function calcTicketStats(tickets: TicketRow[]): TicketStats {
     pendingStakes,
     houseWinRate,
     counts: { won: won.length, lost: lost.length, pending: pending.length, void: voided.length, total: tickets.length },
+  };
+}
+
+function calcSlotStats(spins: SlotRow[]): SlotStats {
+  const totalVolume = spins.reduce((s, x) => s + x.stake, 0);
+  const totalPayouts = spins.reduce((s, x) => s + x.payout, 0);
+  const winCount = spins.filter((x) => x.payout > 0).length;
+  const jackpotCount = spins.filter(
+    (x) => x.symbols === "ferumbras,ferumbras,ferumbras"
+  ).length;
+  const bigWinCount = spins.filter((x) => x.multiplier >= DISCORD_NOTIFY_MULTIPLIER).length;
+  const biggestMultiplier = spins.reduce((m, x) => Math.max(m, x.multiplier), 0);
+  const biggestPayout = spins.reduce((m, x) => Math.max(m, x.payout), 0);
+  return {
+    houseProfit: totalVolume - totalPayouts,
+    totalVolume,
+    totalPayouts,
+    spinCount: spins.length,
+    winCount,
+    jackpotCount,
+    bigWinCount,
+    biggestMultiplier,
+    biggestPayout,
+    avgStake: spins.length > 0 ? totalVolume / spins.length : 0,
+    hitRate: spins.length > 0 ? (winCount / spins.length) * 100 : null,
+    actualRTP: totalVolume > 0 ? (totalPayouts / totalVolume) * 100 : null,
   };
 }
 
@@ -114,12 +164,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const day7Ago = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const day30Ago = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  const [allTickets, allPvPBets, totalUsers, activeEvents] = await Promise.all([
+  const [allTickets, allPvPBets, allSlotSpins, totalUsers, activeEvents] = await Promise.all([
     prisma.ticket.findMany({
       select: { status: true, amount: true, potentialPayout: true, totalOdds: true, currency: true, createdAt: true },
     }),
     prisma.pvPBet.findMany({
       select: { status: true, amount: true, joinerAmount: true, currency: true, createdAt: true },
+    }),
+    prisma.slotSpin.findMany({
+      select: { stake: true, payout: true, multiplier: true, symbols: true, createdAt: true },
     }),
     prisma.user.count(),
     prisma.event.count({ where: { status: { in: ["UPCOMING", "LIVE"] } } }),
@@ -127,6 +180,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const tickets = isTrolian ? allTickets.filter((t) => t.createdAt >= trolianCutoff) : allTickets;
   const pvpBets = isTrolian ? allPvPBets.filter((b) => b.createdAt >= trolianCutoff) : allPvPBets;
+  const slotSpins = isTrolian ? allSlotSpins.filter((s) => s.createdAt >= trolianCutoff) : allSlotSpins;
 
   const allTime = calcTicketStats(tickets);
   const last30d = calcTicketStats(tickets.filter((t) => t.createdAt >= day30Ago));
@@ -136,6 +190,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const pvpGold = calcPvPStats(pvpBets.filter((b) => b.currency === "GOLD"));
   const pvpTc = calcPvPStats(pvpBets.filter((b) => b.currency === "TIBIA_COINS"));
+
+  const slotsAll = calcSlotStats(slotSpins);
+  const slots30d = calcSlotStats(slotSpins.filter((s) => s.createdAt >= day30Ago));
+  const slots7d = calcSlotStats(slotSpins.filter((s) => s.createdAt >= day7Ago));
 
   return (
     <div className="space-y-8">
@@ -277,6 +335,111 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <PvPCard label="Gold" stats={pvpGold} unit="gp" />
           <PvPCard label="Tibia Coins" stats={pvpTc} unit="TC" />
+        </div>
+      </Section>
+
+      {/* Slots */}
+      <Section title="Slots (Tibia Coins)">
+        <div className="space-y-4">
+          {/* Core financials */}
+          <StatGrid cols={4}>
+            <Stat
+              label="House Profit"
+              value={`${slotsAll.houseProfit >= 0 ? "+" : ""}${fmt(slotsAll.houseProfit)} TC`}
+              color={slotsAll.houseProfit >= 0 ? "text-win" : "text-loss"}
+              sub={`${fmt(slotsAll.totalPayouts)} TC paid out`}
+            />
+            <Stat
+              label="Total Volume"
+              value={`${fmt(slotsAll.totalVolume)} TC`}
+              color="text-text-primary"
+              sub="total wagered"
+            />
+            <Stat
+              label="Spins"
+              value={String(slotsAll.spinCount)}
+              color="text-text-primary"
+              sub={`${slotsAll.winCount} winning`}
+            />
+            <Stat
+              label="Hit Rate"
+              value={slotsAll.hitRate != null ? slotsAll.hitRate.toFixed(1) + "%" : "—"}
+              color="text-text-primary"
+              sub="% of spins that paid"
+            />
+          </StatGrid>
+
+          {/* Interesting stats */}
+          <StatGrid cols={4}>
+            <Stat
+              label="Actual RTP"
+              value={slotsAll.actualRTP != null ? slotsAll.actualRTP.toFixed(1) + "%" : "—"}
+              color="text-text-primary"
+              sub="target ~83.7%"
+            />
+            <Stat
+              label="Biggest Multiplier"
+              value={slotsAll.biggestMultiplier > 0 ? `×${slotsAll.biggestMultiplier}` : "—"}
+              color="text-gold"
+              sub={slotsAll.biggestPayout > 0 ? `${fmt(slotsAll.biggestPayout)} TC payout` : undefined}
+            />
+            <Stat
+              label="Jackpots"
+              value={String(slotsAll.jackpotCount)}
+              color={slotsAll.jackpotCount > 0 ? "text-gold" : "text-text-muted"}
+              sub="3× ferumbras"
+            />
+            <Stat
+              label="Big Wins"
+              value={String(slotsAll.bigWinCount)}
+              color="text-win"
+              sub={`×${DISCORD_NOTIFY_MULTIPLIER}+ (Discord pings)`}
+            />
+          </StatGrid>
+
+          {/* Period comparison */}
+          {slotsAll.spinCount > 0 && (
+            <div className="overflow-x-auto pt-2">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-text-muted text-xs uppercase tracking-wide border-b border-border">
+                    <th className="text-left pb-2 pr-4">Period</th>
+                    <th className="text-right pb-2 px-4">Profit</th>
+                    <th className="text-right pb-2 px-4">Volume</th>
+                    <th className="text-right pb-2 px-4">Spins</th>
+                    <th className="text-right pb-2 px-4">RTP</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {(
+                    [
+                      { label: "All-time", s: slotsAll },
+                      { label: "Last 30d", s: slots30d },
+                      { label: "Last 7d", s: slots7d },
+                    ] as const
+                  ).map(({ label, s }) => (
+                    <tr key={label}>
+                      <td className="text-text-secondary py-3 pr-4 font-medium">{label}</td>
+                      <td className={`text-right px-4 font-mono font-semibold ${s.houseProfit >= 0 ? "text-win" : "text-loss"}`}>
+                        {s.houseProfit >= 0 ? "+" : ""}{fmt(s.houseProfit)} TC
+                      </td>
+                      <td className="text-right px-4 text-text-secondary font-mono">
+                        {fmt(s.totalVolume)} TC
+                      </td>
+                      <td className="text-right px-4 text-text-muted">{s.spinCount}</td>
+                      <td className="text-right px-4 text-text-primary font-mono">
+                        {s.actualRTP != null ? s.actualRTP.toFixed(1) + "%" : "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {slotsAll.spinCount === 0 && (
+            <p className="text-text-muted text-sm text-center py-4">No spins yet.</p>
+          )}
         </div>
       </Section>
     </div>

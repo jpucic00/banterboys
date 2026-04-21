@@ -562,3 +562,65 @@ export async function notifyTicketSettled(
     ],
   });
 }
+
+const SLOT_SYMBOL_LABELS: Record<string, string> = {
+  snake: "Snake",
+  dragon_lord: "Dragon Lord",
+  dragon: "Dragon",
+  dark_torturer: "Dark Torturer",
+  demon: "Demon",
+  ferumbras: "Ferumbras",
+};
+
+export async function notifySlotWin(spin: {
+  user: { name: string | null; alias: string | null };
+  stake: number;
+  payout: number;
+  multiplier: number;
+  currency: "GOLD" | "TIBIA_COINS";
+  symbols: readonly string[];
+}): Promise<void> {
+  const player = displayName(spin.user);
+  const symbolLine = spin.symbols
+    .map((s) => SLOT_SYMBOL_LABELS[s] ?? s)
+    .join(" | ");
+  const isJackpot = spin.symbols.every((s) => s === "ferumbras");
+  const title = isJackpot
+    ? `👑 JACKPOT — ${player} landed 3× Ferumbras!`
+    : `🎰 Big Slot Win — ${player}`;
+  const description = isJackpot
+    ? `The Mage King smiles. **${player}** just hit the jackpot on the Tibia Slots.${siteLink("view")}`
+    : `**${player}** hit a ×${spin.multiplier} multiplier on the Tibia Slots.${siteLink("view")}`;
+  const color = isJackpot ? COLORS.orange : COLORS.green;
+
+  await sendWebhook({
+    embeds: [
+      {
+        title,
+        description,
+        color,
+        fields: [
+          { name: "🧑 Player", value: player, inline: true },
+          { name: "🎯 Reels", value: symbolLine, inline: false },
+          {
+            name: "💰 Stake",
+            value: formatCurrency(spin.stake, spin.currency),
+            inline: true,
+          },
+          {
+            name: "📈 Multiplier",
+            value: `×${spin.multiplier}`,
+            inline: true,
+          },
+          {
+            name: "💎 Payout",
+            value: formatCurrency(Math.round(spin.payout), spin.currency),
+            inline: true,
+          },
+        ],
+        footer: { text: "Banter Boys Betting" },
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  });
+}

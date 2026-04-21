@@ -40,6 +40,7 @@ export default function Navbar() {
           <NavLink href="/" active={pathname === "/"}>Overview</NavLink>
           <NavLink href="/bets" active={pathname === "/bets"}>PvP Bets</NavLink>
           <NavLink href="/tickets" active={pathname === "/tickets"}>Bet Slips</NavLink>
+          <NavLink href="/slots" active={pathname === "/slots"}>Slots</NavLink>
           {session && (
             <NavLink href="/profile" active={pathname === "/profile"}>My Profile</NavLink>
           )}
@@ -118,6 +119,7 @@ export default function Navbar() {
               <MobileLink href="/" active={pathname === "/"} onClick={() => setMenuOpen(false)}>Overview</MobileLink>
               <MobileLink href="/bets" active={pathname === "/bets"} onClick={() => setMenuOpen(false)}>PvP Bets</MobileLink>
               <MobileLink href="/tickets" active={pathname === "/tickets"} onClick={() => setMenuOpen(false)}>Bet Slips</MobileLink>
+              <MobileLink href="/slots" active={pathname === "/slots"} onClick={() => setMenuOpen(false)}>Slots</MobileLink>
               {session && (
                 <MobileLink href="/profile" active={pathname === "/profile"} onClick={() => setMenuOpen(false)}>My Profile</MobileLink>
               )}
