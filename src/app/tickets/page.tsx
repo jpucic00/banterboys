@@ -38,6 +38,7 @@ const SPORT_CATEGORIES: Record<string, SportCategory> = {
   soccer_spain_la_liga: "football",
   soccer_germany_bundesliga: "football",
   soccer_italy_serie_a: "football",
+  soccer_italy_coppa_italia: "football",
   soccer_uefa_champs_league: "football",
   soccer_uefa_europa_league: "football",
   soccer_uefa_europa_conference_league: "football",
@@ -61,6 +62,7 @@ const LEAGUE_NAMES: Record<string, string> = {
   soccer_spain_la_liga: "La Liga",
   soccer_germany_bundesliga: "Bundesliga",
   soccer_italy_serie_a: "Serie A",
+  soccer_italy_coppa_italia: "Coppa Italia",
   soccer_uefa_champs_league: "Champions League",
   soccer_uefa_europa_league: "Europa League",
   soccer_uefa_europa_conference_league: "Conference League",
@@ -324,6 +326,7 @@ export default function TicketsPage() {
   const [currency, setCurrency] = useState("GOLD");
   const [submitting, setSubmitting] = useState(false);
   const [tab, setTab] = useState<"build" | "mine">("build");
+  const [ticketFilter, setTicketFilter] = useState<"active" | "all">("active");
   const [mobileSlipOpen, setMobileSlipOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
@@ -529,6 +532,33 @@ export default function TicketsPage() {
             </button>
           )}
         </div>
+        {tab === "mine" && (
+          <div className="flex gap-1.5">
+            {(["active", "all"] as const).map((f) => {
+              const isActive = ticketFilter === f;
+              return (
+                <button
+                  key={f}
+                  onClick={() => setTicketFilter(f)}
+                  className="px-3 py-1 rounded text-xs font-medium uppercase tracking-wide transition-colors cursor-pointer"
+                  style={{
+                    background: isActive ? "#1f1f1f" : "transparent",
+                    border: `1px solid ${isActive ? "#333" : "transparent"}`,
+                    color: isActive ? "#fff" : "#666",
+                  }}
+                  onMouseEnter={(e) => {
+                    if (!isActive) e.currentTarget.style.color = "#fff";
+                  }}
+                  onMouseLeave={(e) => {
+                    if (!isActive) e.currentTarget.style.color = "#666";
+                  }}
+                >
+                  {f}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {tab === "build" && (
@@ -805,20 +835,28 @@ export default function TicketsPage() {
         </div>
       )}
 
-      {tab === "mine" && (
-        <div className="columns-1 md:columns-2 gap-4">
-          {tickets.length === 0 && (
-            <p className="text-text-muted text-center py-10 text-sm">
-              No slips yet. Build one!
-            </p>
-          )}
-          {tickets.map((ticket) => (
-            <div key={ticket.id} className="break-inside-avoid mb-4">
-              <TicketCard ticket={ticket} />
-            </div>
-          ))}
-        </div>
-      )}
+      {tab === "mine" && (() => {
+        const filteredTickets =
+          ticketFilter === "active"
+            ? tickets.filter((t) => t.status === "PENDING")
+            : tickets;
+        return (
+          <div className="columns-1 md:columns-2 gap-4">
+            {filteredTickets.length === 0 && (
+              <p className="text-text-muted text-center py-10 text-sm">
+                {ticketFilter === "active"
+                  ? "No active slips. Build one!"
+                  : "No slips yet. Build one!"}
+              </p>
+            )}
+            {filteredTickets.map((ticket) => (
+              <div key={ticket.id} className="break-inside-avoid mb-4">
+                <TicketCard ticket={ticket} />
+              </div>
+            ))}
+          </div>
+        );
+      })()}
 
       {/* Mobile fixed bottom slip — portalled to body to escape any parent constraints */}
       {mounted && tab === "build" && createPortal(
