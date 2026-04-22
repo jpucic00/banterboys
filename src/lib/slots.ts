@@ -113,6 +113,8 @@ export type SpinResult = {
   kind: "3x" | "2x" | "none" | "bonus";
   winSymbol: SlotSymbol | null;
   bonusTrigger: boolean;
+  /** Free spins awarded by this spin (0, FREE_SPINS_AWARDED_PAIR, or FREE_SPINS_AWARDED_TRIPLE). */
+  bonusSpinsAwarded: number;
 };
 
 export function resolveSpin(
@@ -120,15 +122,31 @@ export function resolveSpin(
   stake: number
 ): SpinResult {
   const [a, b, c] = symbols;
+  const jokerCount =
+    (a === "joker" ? 1 : 0) +
+    (b === "joker" ? 1 : 0) +
+    (c === "joker" ? 1 : 0);
 
-  // Scatter bonus: 3 jokers trigger free spins and pay nothing directly.
-  if (a === "joker" && b === "joker" && c === "joker") {
+  // Scatter bonus tiers: 3 jokers → big bonus, 2 jokers → small bonus. Both
+  // pay nothing directly; the award is free spins at a multiplier.
+  if (jokerCount === 3) {
     return {
       payout: 0,
       multiplier: 0,
       kind: "bonus",
       winSymbol: "joker",
       bonusTrigger: true,
+      bonusSpinsAwarded: FREE_SPINS_AWARDED_TRIPLE,
+    };
+  }
+  if (jokerCount === 2) {
+    return {
+      payout: 0,
+      multiplier: 0,
+      kind: "bonus",
+      winSymbol: "joker",
+      bonusTrigger: true,
+      bonusSpinsAwarded: FREE_SPINS_AWARDED_PAIR,
     };
   }
 
@@ -141,6 +159,7 @@ export function resolveSpin(
         kind: "3x",
         winSymbol: a,
         bonusTrigger: false,
+        bonusSpinsAwarded: 0,
       };
     }
   }
@@ -159,6 +178,7 @@ export function resolveSpin(
       kind: "2x",
       winSymbol: pairSymbol,
       bonusTrigger: false,
+      bonusSpinsAwarded: 0,
     };
   }
 
@@ -168,6 +188,7 @@ export function resolveSpin(
     kind: "none",
     winSymbol: null,
     bonusTrigger: false,
+    bonusSpinsAwarded: 0,
   };
 }
 
@@ -190,9 +211,11 @@ export const MAX_SLOT_DEBT = 500;
 export const GAMBLE_CARDS = 2;
 export const MAX_GAMBLE_ROUNDS = 5;
 
-// Free-spin bonus: 3 jokers on a single spin award FREE_SPINS_AWARDED spins
-// with the triggering stake locked. Retriggers add more. All wins during the
-// bonus round are multiplied by FREE_SPIN_WIN_MULTIPLIER.
-export const FREE_SPIN_TRIGGER_COUNT = 3;
-export const FREE_SPINS_AWARDED = 10;
+// Free-spin bonus tiers. Jesters are scatter symbols: 3 on the payline awards
+// the big bonus, 2 awards a smaller one. Both lock the triggering stake.
+// Retriggers during the bonus round stack the awards. All wins during the
+// bonus are multiplied by FREE_SPIN_WIN_MULTIPLIER.
+export const FREE_SPINS_AWARDED_TRIPLE = 10;
+export const FREE_SPINS_AWARDED_PAIR = 2;
 export const FREE_SPIN_WIN_MULTIPLIER = 2;
+export const FREE_SPIN_TRIGGER_COUNT = 3;

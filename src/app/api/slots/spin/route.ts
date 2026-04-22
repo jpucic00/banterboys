@@ -8,7 +8,6 @@ import {
   STAKE_LIMITS,
   DISCORD_NOTIFY_MULTIPLIER,
   MAX_SLOT_DEBT,
-  FREE_SPINS_AWARDED,
   FREE_SPIN_WIN_MULTIPLIER,
 } from "@/lib/slots";
 import { checkSlotThrottle } from "@/lib/slots-rate-limit";
@@ -91,7 +90,7 @@ export async function POST(req: NextRequest) {
 
       const symbols = spinReels();
       const baseResult = resolveSpin(symbols, stake);
-      const { bonusTrigger } = baseResult;
+      const { bonusTrigger, bonusSpinsAwarded } = baseResult;
       // Bonus-round wins are boosted by FREE_SPIN_WIN_MULTIPLIER. The stake
       // stored on the SlotSpin row stays at the locked value so the effective
       // multiplier (payout / stake) reflects the boost for analytics.
@@ -110,16 +109,15 @@ export async function POST(req: NextRequest) {
         // gets its own double-or-nothing opportunity (same pattern as paid
         // spins), so seed the gamble from this spin's payout — any pending
         // gamble from the previous free spin is auto-collected.
-        // Retriggers on 3 jokers add more free spins.
+        // Retriggers (2 or 3 jokers) stack on top of the remaining count.
         saldoDelta = payout;
-        newFreeSpins =
-          user.activeFreeSpins - 1 + (bonusTrigger ? FREE_SPINS_AWARDED : 0);
+        newFreeSpins = user.activeFreeSpins - 1 + bonusSpinsAwarded;
         newFreeSpinStake = newFreeSpins > 0 ? user.freeSpinStake : 0;
         newGambleAmount = payout > 0 ? payout : 0;
       } else if (bonusTrigger) {
         // Paid spin that triggered the bonus: debit stake, no payout this spin.
         saldoDelta = -stake;
-        newFreeSpins = FREE_SPINS_AWARDED;
+        newFreeSpins = bonusSpinsAwarded;
         newFreeSpinStake = stake;
         newGambleAmount = 0;
       } else {
@@ -164,6 +162,7 @@ export async function POST(req: NextRequest) {
         multiplier,
         stake,
         bonusTrigger,
+        bonusSpinsAwarded,
         isFreeSpin: inBonus,
         activeFreeSpins: newFreeSpins,
         freeSpinStake: newFreeSpinStake,
@@ -171,9 +170,13 @@ export async function POST(req: NextRequest) {
       };
     });
 
-    // Big-win Discord ping, plus a special ping when the joker bonus triggers.
+    // Big-win Discord ping, plus a special ping for the big 3-joker bonus.
+    // The 2-joker pair bonus is much more frequent (~1 in 234) so we skip it
+    // to avoid spamming the guild channel.
     // Fire and forget — never blocks the response.
-    if (result.multiplier >= DISCORD_NOTIFY_MULTIPLIER || result.bonusTrigger) {
+    const bigBonus =
+      result.bonusTrigger && result.symbols.every((s) => s === "joker");
+    if (result.multiplier >= DISCORD_NOTIFY_MULTIPLIER || bigBonus) {
       notifySlotWin({
         user: {
           name: session.user.name ?? null,
@@ -186,6 +189,7 @@ export async function POST(req: NextRequest) {
         currency: "TIBIA_COINS",
         symbols: result.symbols,
         bonusTrigger: result.bonusTrigger,
+        bonusSpinsAwarded: result.bonusSpinsAwarded,
         isFreeSpin: result.isFreeSpin,
       }).catch(() => {});
     }
@@ -198,6 +202,7 @@ export async function POST(req: NextRequest) {
       stake: result.stake,
       newBalance: result.newBalance,
       bonusTrigger: result.bonusTrigger,
+      bonusSpinsAwarded: result.bonusSpinsAwarded,
       isFreeSpin: result.isFreeSpin,
       activeFreeSpins: result.activeFreeSpins,
       freeSpinStake: result.freeSpinStake,

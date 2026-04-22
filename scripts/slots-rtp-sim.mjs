@@ -30,7 +30,8 @@ const PAIR = {
   demon: 10,
   ferumbras: 20,
 };
-const FREE_SPINS_AWARDED = 10;
+const FREE_SPINS_AWARDED_TRIPLE = 10;
+const FREE_SPINS_AWARDED_PAIR = 2;
 const FREE_SPIN_WIN_MULTIPLIER = 2;
 
 const STRIP = [];
@@ -48,12 +49,12 @@ function spin() {
 
 function resolve(symbols, stake) {
   const [a, b, c] = symbols;
-  if (a === "joker" && b === "joker" && c === "joker") {
-    return { payout: 0, multiplier: 0, bonusTrigger: true };
-  }
+  const jc = (a === "joker") + (b === "joker") + (c === "joker");
+  if (jc === 3) return { payout: 0, multiplier: 0, bonusTrigger: true, bonusSpins: FREE_SPINS_AWARDED_TRIPLE };
+  if (jc === 2) return { payout: 0, multiplier: 0, bonusTrigger: true, bonusSpins: FREE_SPINS_AWARDED_PAIR };
   if (a === b && b === c && THREE[a]) {
     const m = THREE[a];
-    return { payout: stake * m, multiplier: m, bonusTrigger: false };
+    return { payout: stake * m, multiplier: m, bonusTrigger: false, bonusSpins: 0 };
   }
   let pair = null;
   if (a === b) pair = a;
@@ -61,9 +62,9 @@ function resolve(symbols, stake) {
   else if (b === c) pair = b;
   if (pair && PAIR[pair]) {
     const m = PAIR[pair];
-    return { payout: stake * m, multiplier: m, bonusTrigger: false };
+    return { payout: stake * m, multiplier: m, bonusTrigger: false, bonusSpins: 0 };
   }
-  return { payout: 0, multiplier: 0, bonusTrigger: false };
+  return { payout: 0, multiplier: 0, bonusTrigger: false, bonusSpins: 0 };
 }
 
 const N = Number(process.argv[2] ?? 1_000_000);
@@ -83,15 +84,15 @@ for (let i = 0; i < N; i++) {
   returned += r.payout;
   if (r.bonusTrigger) {
     bonusTriggers += 1;
-    // Award free spins; retriggers allowed. Wins during the bonus are
+    // Award free spins; retriggers stack. Wins during the bonus are
     // multiplied by FREE_SPIN_WIN_MULTIPLIER.
-    let remaining = FREE_SPINS_AWARDED;
+    let remaining = r.bonusSpins;
     while (remaining > 0) {
       remaining -= 1;
       freeSpins += 1;
       const fr = resolve(spin(), stake);
       returned += fr.payout * FREE_SPIN_WIN_MULTIPLIER;
-      if (fr.bonusTrigger) remaining += FREE_SPINS_AWARDED;
+      if (fr.bonusTrigger) remaining += fr.bonusSpins;
     }
   }
 }

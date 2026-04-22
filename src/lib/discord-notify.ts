@@ -581,6 +581,7 @@ export async function notifySlotWin(spin: {
   currency: "GOLD" | "TIBIA_COINS";
   symbols: readonly string[];
   bonusTrigger?: boolean;
+  bonusSpinsAwarded?: number;
   isFreeSpin?: boolean;
 }): Promise<void> {
   const player = displayName(spin.user);
@@ -593,8 +594,13 @@ export async function notifySlotWin(spin: {
   let description: string;
   let color: number;
   if (spin.bonusTrigger) {
-    title = `🃏 Jester Strike — ${player} triggered the bonus!`;
-    description = `Three Jester Dolls! **${player}** just won 10 free spins at ×2 wins on the Tibia Slots.${siteLink(
+    const awarded = spin.bonusSpinsAwarded ?? 10;
+    const jesters = spin.symbols.filter((s) => s === "joker").length;
+    title =
+      jesters >= 3
+        ? `🃏 Jester Strike — ${player} triggered the big bonus!`
+        : `🃏 Jester Pair — ${player} caught a mini-bonus!`;
+    description = `${jesters} Jester Dolls! **${player}** just won ${awarded} free spins at ×2 wins on the Tibia Slots.${siteLink(
       "view"
     )}`;
     color = COLORS.orange;
@@ -634,7 +640,11 @@ export async function notifySlotWin(spin: {
       }
     );
   } else {
-    fields.push({ name: "🎁 Bonus", value: "10 free spins", inline: true });
+    fields.push({
+      name: "🎁 Bonus",
+      value: `${spin.bonusSpinsAwarded ?? 10} free spins`,
+      inline: true,
+    });
   }
 
   await sendWebhook({

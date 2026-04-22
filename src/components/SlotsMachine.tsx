@@ -15,7 +15,8 @@ import {
   MAX_SLOT_DEBT,
   GAMBLE_CARDS,
   MAX_GAMBLE_ROUNDS,
-  FREE_SPINS_AWARDED,
+  FREE_SPINS_AWARDED_PAIR,
+  FREE_SPINS_AWARDED_TRIPLE,
   FREE_SPIN_WIN_MULTIPLIER,
 } from "@/lib/slots";
 
@@ -45,6 +46,7 @@ type SpinResponse = {
   stake: number;
   newBalance: number;
   bonusTrigger: boolean;
+  bonusSpinsAwarded: number;
   isFreeSpin: boolean;
   activeFreeSpins: number;
   freeSpinStake: number;
@@ -81,8 +83,10 @@ function deriveWinningPositions(
   bonusTrigger: boolean
 ): [boolean, boolean, boolean] {
   if (!symbols) return [false, false, false];
-  // Bonus trigger: 3 jokers pulse even though multiplier is 0.
-  if (bonusTrigger) return [true, true, true];
+  // Bonus trigger: pulse the joker cells (all 3 for triple, just the 2 for pair).
+  if (bonusTrigger) {
+    return symbols.map((s) => s === "joker") as [boolean, boolean, boolean];
+  }
   if (multiplier === 0) return [false, false, false];
   const [a, b, c] = symbols;
   if (a === b && b === c) return [true, true, true];
@@ -135,9 +139,9 @@ export default function SlotsMachine({
     initialFreeSpin.freeSpinStake
   );
   // Tracks whether we just triggered the bonus (for a full-size banner) or
-  // retriggered mid-bonus (for a small "+5 spins" banner).
+  // retriggered mid-bonus (for a small "+N spins" banner).
   const [bonusBanner, setBonusBanner] = useState<
-    { kind: "trigger" | "retrigger"; key: string } | null
+    { kind: "trigger" | "retrigger"; key: string; spins: number; jokers: 2 | 3 } | null
   >(null);
   const bonusBannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -220,10 +224,13 @@ export default function SlotsMachine({
         setResultVisible(true);
 
         if (triggeredFromPaid || triggeredMidBonus) {
+          const jokers = data.symbols.filter((s) => s === "joker").length as 2 | 3;
           if (bonusBannerTimer.current) clearTimeout(bonusBannerTimer.current);
           setBonusBanner({
             kind: triggeredMidBonus ? "retrigger" : "trigger",
             key: data.spinId,
+            spins: data.bonusSpinsAwarded,
+            jokers,
           });
           bonusBannerTimer.current = setTimeout(
             () => setBonusBanner(null),
@@ -374,7 +381,7 @@ export default function SlotsMachine({
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <p className="text-text-muted text-xs">
-            Match 3 symbols for big payouts. 3 Jesters trigger {FREE_SPINS_AWARDED} free spins at ×{FREE_SPIN_WIN_MULTIPLIER} wins.
+            Match 3 symbols for big payouts. 2 Jesters award {FREE_SPINS_AWARDED_PAIR}, 3 award {FREE_SPINS_AWARDED_TRIPLE} free spins at ×{FREE_SPIN_WIN_MULTIPLIER}.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -475,15 +482,22 @@ export default function SlotsMachine({
               className="px-5 py-2 rounded-md font-black uppercase tracking-widest text-sm flex items-center gap-2"
               style={{
                 background:
-                  "linear-gradient(to right, #A855F7, #F0A818, #A855F7)",
+                  bonusBanner.jokers >= 3
+                    ? "linear-gradient(to right, #A855F7, #F0A818, #A855F7)"
+                    : "linear-gradient(to right, #6B21A8, #A855F7, #6B21A8)",
                 color: "#1a1a1a",
-                boxShadow: "0 0 24px rgba(168, 85, 247, 0.8)",
+                boxShadow:
+                  bonusBanner.jokers >= 3
+                    ? "0 0 24px rgba(168, 85, 247, 0.8)"
+                    : "0 0 16px rgba(168, 85, 247, 0.55)",
                 animation:
                   "slots-banner-pop 450ms cubic-bezier(0.34, 1.56, 0.64, 1) both",
               }}
             >
               <span>🃏</span>
-              <span>3 JESTERS — {FREE_SPINS_AWARDED} FREE SPINS × {FREE_SPIN_WIN_MULTIPLIER}</span>
+              <span>
+                {bonusBanner.jokers} JESTERS — {bonusBanner.spins} FREE SPINS × {FREE_SPIN_WIN_MULTIPLIER}
+              </span>
               <span>🃏</span>
             </div>
           )}
@@ -500,7 +514,7 @@ export default function SlotsMachine({
                   "slots-banner-pop 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both",
               }}
             >
-              +{FREE_SPINS_AWARDED} Free Spins!
+              +{bonusBanner.spins} Free Spins!
             </div>
           )}
           {!bonusBanner && isJackpot && (
@@ -1162,6 +1176,73 @@ function Paytable() {
           </div>
         </div>
       </div>
+
+      {/* Jester bonus tiers — scatter rewards, paid in free spins at ×2 wins. */}
+      <div
+        className="p-3"
+        style={{ borderTop: "1px solid #252525", background: "#0f0a18" }}
+      >
+        <div
+          className="text-[10px] uppercase tracking-wide mb-2 font-bold"
+          style={{ color: "#A855F7" }}
+        >
+          🃏 Jester Bonus
+        </div>
+        <div className="space-y-1.5">
+          <BonusRow
+            jokers={3}
+            reward={`${FREE_SPINS_AWARDED_TRIPLE} free spins × ${FREE_SPIN_WIN_MULTIPLIER}`}
+            tone="big"
+          />
+          <BonusRow
+            jokers={2}
+            reward={`${FREE_SPINS_AWARDED_PAIR} free spins × ${FREE_SPIN_WIN_MULTIPLIER}`}
+            tone="small"
+          />
+          <div className="text-[10px] text-text-muted italic pt-1">
+            Jesters pay no multiplier on their own — they trigger free spins
+            (wins pay ×{FREE_SPIN_WIN_MULTIPLIER} during the bonus).
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BonusRow({
+  jokers,
+  reward,
+  tone,
+}: {
+  jokers: 2 | 3;
+  reward: string;
+  tone: "big" | "small";
+}) {
+  return (
+    <div className="flex items-center justify-between gap-2 text-sm">
+      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+        <div className="flex items-center gap-1.5 shrink-0">
+          {Array.from({ length: jokers }).map((_, i) => (
+            <Image
+              key={i}
+              src={SPRITE_PATH.joker}
+              alt=""
+              width={20}
+              height={20}
+              style={{ imageRendering: "pixelated" }}
+            />
+          ))}
+        </div>
+        <span className="text-text-secondary text-xs ml-1 truncate">
+          {jokers} Jester{jokers > 1 ? "s" : ""}
+        </span>
+      </div>
+      <span
+        className="font-mono text-xs shrink-0 whitespace-nowrap"
+        style={{ color: tone === "big" ? "#F0A818" : "#A855F7" }}
+      >
+        {reward}
+      </span>
     </div>
   );
 }
