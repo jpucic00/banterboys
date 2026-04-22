@@ -8,6 +8,8 @@ import {
   STAKE_LIMITS,
   DISCORD_NOTIFY_MULTIPLIER,
   MAX_SLOT_DEBT,
+  FREE_SPINS_AWARDED,
+  FREE_SPIN_WIN_MULTIPLIER,
 } from "@/lib/slots";
 import { checkSlotThrottle } from "@/lib/slots-rate-limit";
 import { notifySlotWin } from "@/lib/discord-notify";
@@ -45,59 +47,97 @@ export async function POST(req: NextRequest) {
   }
   const currency = Currency.TIBIA_COINS;
 
-  const stake = Number(body.stake);
-  if (
-    !Number.isFinite(stake) ||
-    !Number.isInteger(stake) ||
-    stake <= 0
-  ) {
-    return NextResponse.json(
-      { error: "Stake must be a positive integer." },
-      { status: 400 }
-    );
-  }
-
+  const requestedStake = Number(body.stake);
   const limits = STAKE_LIMITS.TIBIA_COINS;
-  if (stake < limits.min || stake > limits.max) {
-    return NextResponse.json(
-      { error: `Stake must be between ${limits.min} and ${limits.max} TC.` },
-      { status: 400 }
-    );
-  }
-
-  // Decide the outcome server-side before any DB work.
-  const symbols = spinReels();
-  const { payout, multiplier } = resolveSpin(symbols, stake);
-  const net = payout - stake;
-  const symbolsStr = symbols.join(",");
+  // Note: stake is validated only on the paid-spin branch inside the
+  // transaction. Free spins use the server-locked stake instead.
 
   try {
-    const { newBalance, spinId, activeGambleAmount } = await prisma.$transaction(async (tx) => {
-      // Balance is allowed to go negative — house tracks the debt via saldo
-      // until it's paid off in-game. But cap the slot-side debt at MAX_SLOT_DEBT
-      // so losses can't spiral indefinitely.
+    const result = await prisma.$transaction(async (tx) => {
       const user = await tx.user.findUnique({
         where: { id: userId },
-        select: { saldoTibiaCoins: true },
+        select: {
+          saldoTibiaCoins: true,
+          activeFreeSpins: true,
+          freeSpinStake: true,
+          activeGambleAmount: true,
+        },
       });
       if (!user) throw new Error("USER_NOT_FOUND");
 
-      // Worst case: the spin loses and net = -stake. Check against debt cap.
-      if (user.saldoTibiaCoins - stake < -MAX_SLOT_DEBT) {
-        throw new Error("DEBT_LIMIT");
+      const inBonus = user.activeFreeSpins > 0;
+
+      // Lock stake from server state for free spins; otherwise trust client input.
+      let stake: number;
+      if (inBonus) {
+        stake = user.freeSpinStake;
+      } else {
+        if (
+          !Number.isFinite(requestedStake) ||
+          !Number.isInteger(requestedStake) ||
+          requestedStake <= 0
+        ) {
+          throw new Error("BAD_STAKE");
+        }
+        if (requestedStake < limits.min || requestedStake > limits.max) {
+          throw new Error("STAKE_OUT_OF_RANGE");
+        }
+        // Worst case: the spin loses and net = -stake. Check against debt cap.
+        if (user.saldoTibiaCoins - requestedStake < -MAX_SLOT_DEBT) {
+          throw new Error("DEBT_LIMIT");
+        }
+        stake = requestedStake;
       }
 
-      // Any pending gamble from a previous spin is auto-collected here (the
-      // winnings were already credited at that spin, so there's no balance
-      // change — just clear the active-gamble state).
-      // Gamble seed is the full payout (stake + profit), matching how classic
-      // slot gamble features work: you risk everything you just won.
-      const gambleSeed = payout > 0 ? payout : 0;
+      const symbols = spinReels();
+      const baseResult = resolveSpin(symbols, stake);
+      const { bonusTrigger } = baseResult;
+      // Bonus-round wins are boosted by FREE_SPIN_WIN_MULTIPLIER. The stake
+      // stored on the SlotSpin row stays at the locked value so the effective
+      // multiplier (payout / stake) reflects the boost for analytics.
+      const boost = inBonus ? FREE_SPIN_WIN_MULTIPLIER : 1;
+      const payout = baseResult.payout * boost;
+      const multiplier = baseResult.multiplier * boost;
+      const symbolsStr = symbols.join(",");
+
+      let newFreeSpins: number;
+      let newFreeSpinStake: number;
+      let newGambleAmount: number;
+      let saldoDelta: number;
+
+      if (inBonus) {
+        // Free spin: no stake debit. Credit any payout. Each winning free spin
+        // gets its own double-or-nothing opportunity (same pattern as paid
+        // spins), so seed the gamble from this spin's payout — any pending
+        // gamble from the previous free spin is auto-collected.
+        // Retriggers on 3 jokers add more free spins.
+        saldoDelta = payout;
+        newFreeSpins =
+          user.activeFreeSpins - 1 + (bonusTrigger ? FREE_SPINS_AWARDED : 0);
+        newFreeSpinStake = newFreeSpins > 0 ? user.freeSpinStake : 0;
+        newGambleAmount = payout > 0 ? payout : 0;
+      } else if (bonusTrigger) {
+        // Paid spin that triggered the bonus: debit stake, no payout this spin.
+        saldoDelta = -stake;
+        newFreeSpins = FREE_SPINS_AWARDED;
+        newFreeSpinStake = stake;
+        newGambleAmount = 0;
+      } else {
+        // Ordinary paid spin. Existing behavior: net = payout - stake, seed
+        // gamble with the full payout (auto-collecting any prior gamble).
+        saldoDelta = payout - stake;
+        newFreeSpins = 0;
+        newFreeSpinStake = 0;
+        newGambleAmount = payout > 0 ? payout : 0;
+      }
+
       const updated = await tx.user.update({
         where: { id: userId },
         data: {
-          saldoTibiaCoins: { increment: net },
-          activeGambleAmount: gambleSeed,
+          saldoTibiaCoins: { increment: saldoDelta },
+          activeFreeSpins: newFreeSpins,
+          freeSpinStake: newFreeSpinStake,
+          activeGambleAmount: newGambleAmount,
           activeGambleRounds: 0,
         },
         select: { saldoTibiaCoins: true },
@@ -111,6 +151,7 @@ export async function POST(req: NextRequest) {
           payout,
           multiplier,
           symbols: symbolsStr,
+          isFreeSpin: inBonus,
         },
         select: { id: true },
       });
@@ -118,39 +159,67 @@ export async function POST(req: NextRequest) {
       return {
         newBalance: updated.saldoTibiaCoins,
         spinId: spin.id,
-        activeGambleAmount: gambleSeed,
+        symbols,
+        payout,
+        multiplier,
+        stake,
+        bonusTrigger,
+        isFreeSpin: inBonus,
+        activeFreeSpins: newFreeSpins,
+        freeSpinStake: newFreeSpinStake,
+        activeGambleAmount: newGambleAmount,
       };
     });
 
-    // Big-win Discord ping. Fire and forget — never blocks the response.
-    if (multiplier >= DISCORD_NOTIFY_MULTIPLIER) {
+    // Big-win Discord ping, plus a special ping when the joker bonus triggers.
+    // Fire and forget — never blocks the response.
+    if (result.multiplier >= DISCORD_NOTIFY_MULTIPLIER || result.bonusTrigger) {
       notifySlotWin({
         user: {
           name: session.user.name ?? null,
           alias:
             (session.user as { alias?: string | null }).alias ?? null,
         },
-        stake,
-        payout,
-        multiplier,
+        stake: result.stake,
+        payout: result.payout,
+        multiplier: result.multiplier,
         currency: "TIBIA_COINS",
-        symbols,
+        symbols: result.symbols,
+        bonusTrigger: result.bonusTrigger,
+        isFreeSpin: result.isFreeSpin,
       }).catch(() => {});
     }
 
     return NextResponse.json({
-      spinId,
-      symbols,
-      payout,
-      multiplier,
-      newBalance,
-      activeGambleAmount,
+      spinId: result.spinId,
+      symbols: result.symbols,
+      payout: result.payout,
+      multiplier: result.multiplier,
+      stake: result.stake,
+      newBalance: result.newBalance,
+      bonusTrigger: result.bonusTrigger,
+      isFreeSpin: result.isFreeSpin,
+      activeFreeSpins: result.activeFreeSpins,
+      freeSpinStake: result.freeSpinStake,
+      activeGambleAmount: result.activeGambleAmount,
       activeGambleRounds: 0,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown";
     if (msg === "USER_NOT_FOUND") {
       return NextResponse.json({ error: "User not found." }, { status: 404 });
+    }
+    if (msg === "BAD_STAKE") {
+      return NextResponse.json(
+        { error: "Stake must be a positive integer." },
+        { status: 400 }
+      );
+    }
+    if (msg === "STAKE_OUT_OF_RANGE") {
+      return NextResponse.json(
+        { error: `Stake must be between ${limits.min} and ${limits.max} TC.` },
+        { status: 400 }
+      );
     }
     if (msg === "DEBT_LIMIT") {
       return NextResponse.json(

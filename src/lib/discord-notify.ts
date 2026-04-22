@@ -570,6 +570,7 @@ const SLOT_SYMBOL_LABELS: Record<string, string> = {
   dark_torturer: "Dark Torturer",
   demon: "Demon",
   ferumbras: "Ferumbras",
+  joker: "Jester Doll",
 };
 
 export async function notifySlotWin(spin: {
@@ -579,19 +580,62 @@ export async function notifySlotWin(spin: {
   multiplier: number;
   currency: "GOLD" | "TIBIA_COINS";
   symbols: readonly string[];
+  bonusTrigger?: boolean;
+  isFreeSpin?: boolean;
 }): Promise<void> {
   const player = displayName(spin.user);
   const symbolLine = spin.symbols
     .map((s) => SLOT_SYMBOL_LABELS[s] ?? s)
     .join(" | ");
   const isJackpot = spin.symbols.every((s) => s === "ferumbras");
-  const title = isJackpot
-    ? `👑 JACKPOT — ${player} landed 3× Ferumbras!`
-    : `🎰 Big Slot Win — ${player}`;
-  const description = isJackpot
-    ? `The Mage King smiles. **${player}** just hit the jackpot on the Tibia Slots.${siteLink("view")}`
-    : `**${player}** hit a ×${spin.multiplier} multiplier on the Tibia Slots.${siteLink("view")}`;
-  const color = isJackpot ? COLORS.orange : COLORS.green;
+
+  let title: string;
+  let description: string;
+  let color: number;
+  if (spin.bonusTrigger) {
+    title = `🃏 Jester Strike — ${player} triggered the bonus!`;
+    description = `Three Jester Dolls! **${player}** just won 10 free spins at ×2 wins on the Tibia Slots.${siteLink(
+      "view"
+    )}`;
+    color = COLORS.orange;
+  } else if (isJackpot) {
+    title = `👑 JACKPOT — ${player} landed 3× Ferumbras!`;
+    description = `The Mage King smiles. **${player}** just hit the jackpot on the Tibia Slots.${siteLink(
+      "view"
+    )}`;
+    color = COLORS.orange;
+  } else {
+    title = spin.isFreeSpin
+      ? `🎰 Big Free-Spin Win — ${player}`
+      : `🎰 Big Slot Win — ${player}`;
+    description = `**${player}** hit a ×${spin.multiplier} multiplier on the Tibia Slots${
+      spin.isFreeSpin ? " during a bonus round" : ""
+    }.${siteLink("view")}`;
+    color = COLORS.green;
+  }
+
+  const stakeLabel = spin.isFreeSpin ? "💰 Stake (free spin)" : "💰 Stake";
+  const fields: { name: string; value: string; inline?: boolean }[] = [
+    { name: "🧑 Player", value: player, inline: true },
+    { name: "🎯 Reels", value: symbolLine, inline: false },
+    {
+      name: stakeLabel,
+      value: formatCurrency(spin.stake, spin.currency),
+      inline: true,
+    },
+  ];
+  if (!spin.bonusTrigger) {
+    fields.push(
+      { name: "📈 Multiplier", value: `×${spin.multiplier}`, inline: true },
+      {
+        name: "💎 Payout",
+        value: formatCurrency(Math.round(spin.payout), spin.currency),
+        inline: true,
+      }
+    );
+  } else {
+    fields.push({ name: "🎁 Bonus", value: "10 free spins", inline: true });
+  }
 
   await sendWebhook({
     embeds: [
@@ -599,25 +643,7 @@ export async function notifySlotWin(spin: {
         title,
         description,
         color,
-        fields: [
-          { name: "🧑 Player", value: player, inline: true },
-          { name: "🎯 Reels", value: symbolLine, inline: false },
-          {
-            name: "💰 Stake",
-            value: formatCurrency(spin.stake, spin.currency),
-            inline: true,
-          },
-          {
-            name: "📈 Multiplier",
-            value: `×${spin.multiplier}`,
-            inline: true,
-          },
-          {
-            name: "💎 Payout",
-            value: formatCurrency(Math.round(spin.payout), spin.currency),
-            inline: true,
-          },
-        ],
+        fields,
         footer: { text: "Banter Boys Betting" },
         timestamp: new Date().toISOString(),
       },

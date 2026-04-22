@@ -6,7 +6,8 @@ export type SlotSymbol =
   | "dragon"
   | "dark_torturer"
   | "demon"
-  | "ferumbras";
+  | "ferumbras"
+  | "joker";
 
 export const SYMBOLS: SlotSymbol[] = [
   "snake",
@@ -15,9 +16,11 @@ export const SYMBOLS: SlotSymbol[] = [
   "dark_torturer",
   "demon",
   "ferumbras",
+  "joker",
 ];
 
-// Same weights on all 3 reels (v1). Total = 100.
+// Same weights on all 3 reels. Total = 104. Joker is a scatter: no base payout,
+// 3 jokers triggers the free-spin bonus.
 export const REEL_WEIGHTS: Record<SlotSymbol, number> = {
   snake: 42,
   dragon: 25,
@@ -25,19 +28,21 @@ export const REEL_WEIGHTS: Record<SlotSymbol, number> = {
   dark_torturer: 10,
   demon: 6,
   ferumbras: 2,
+  joker: 4,
 };
 
-// Multipliers on stake. 3-of-a-kind always wins over pair.
-// Tuned for ~91% RTP (9% house edge).
+// Multipliers on stake. 3-of-a-kind always wins over pair. Joker has no
+// entry — it only triggers the bonus when 3 land. Triple multipliers bumped
+// slightly vs. pre-joker to compensate for the weight dilution and keep RTP ~91%.
 export const PAYTABLE = {
   threeOfAKind: {
-    snake: 5,
-    dragon: 8,
-    dragon_lord: 15,
-    dark_torturer: 25,
-    demon: 80,
-    ferumbras: 200,
-  } as Record<SlotSymbol, number>,
+    snake: 6,
+    dragon: 9,
+    dragon_lord: 16,
+    dark_torturer: 28,
+    demon: 90,
+    ferumbras: 220,
+  } as Partial<Record<SlotSymbol, number>>,
   pair: {
     dragon_lord: 2,
     dark_torturer: 3,
@@ -53,6 +58,7 @@ export const SPRITE_PATH: Record<SlotSymbol, string> = {
   dark_torturer: "/tibia/dark_torturer.webp",
   demon: "/tibia/demon.webp",
   ferumbras: "/tibia/ferumbras.webp",
+  joker: "/tibia/jester_doll.webp",
 };
 
 export const SYMBOL_LABEL: Record<SlotSymbol, string> = {
@@ -62,15 +68,33 @@ export const SYMBOL_LABEL: Record<SlotSymbol, string> = {
   dark_torturer: "Dark Torturer",
   demon: "Demon",
   ferumbras: "Ferumbras",
+  joker: "Jester Doll",
 };
 
 // Build a flat weight array once; pick uniformly from it with crypto.randomInt.
+// Dev override: set SLOTS_DEBUG_JOKER_WEIGHT to a positive integer in
+// .env.local to inflate the joker probability so the bonus triggers often
+// enough to test. RTP is off-tune while set — do NOT ship this enabled.
 const REEL_STRIP: SlotSymbol[] = (() => {
+  const debugJokerWeight = Number(process.env.SLOTS_DEBUG_JOKER_WEIGHT);
+  const overrideJoker =
+    Number.isFinite(debugJokerWeight) && debugJokerWeight > 0
+      ? Math.floor(debugJokerWeight)
+      : null;
+  const weights: Record<SlotSymbol, number> =
+    overrideJoker !== null
+      ? { ...REEL_WEIGHTS, joker: overrideJoker }
+      : REEL_WEIGHTS;
+  if (overrideJoker !== null) {
+    console.warn(
+      `[slots] SLOTS_DEBUG_JOKER_WEIGHT=${overrideJoker} — joker weight overridden for testing. RTP is off-tune.`
+    );
+  }
   const strip: SlotSymbol[] = [];
   for (const s of SYMBOLS) {
-    for (let i = 0; i < REEL_WEIGHTS[s]; i++) strip.push(s);
+    for (let i = 0; i < weights[s]; i++) strip.push(s);
   }
-  return strip; // length = 100
+  return strip;
 })();
 
 export function spinReels(): [SlotSymbol, SlotSymbol, SlotSymbol] {
@@ -86,8 +110,9 @@ export function spinReels(): [SlotSymbol, SlotSymbol, SlotSymbol] {
 export type SpinResult = {
   payout: number;
   multiplier: number;
-  kind: "3x" | "2x" | "none";
+  kind: "3x" | "2x" | "none" | "bonus";
   winSymbol: SlotSymbol | null;
+  bonusTrigger: boolean;
 };
 
 export function resolveSpin(
@@ -96,9 +121,28 @@ export function resolveSpin(
 ): SpinResult {
   const [a, b, c] = symbols;
 
+  // Scatter bonus: 3 jokers trigger free spins and pay nothing directly.
+  if (a === "joker" && b === "joker" && c === "joker") {
+    return {
+      payout: 0,
+      multiplier: 0,
+      kind: "bonus",
+      winSymbol: "joker",
+      bonusTrigger: true,
+    };
+  }
+
   if (a === b && b === c) {
     const m = PAYTABLE.threeOfAKind[a];
-    return { payout: stake * m, multiplier: m, kind: "3x", winSymbol: a };
+    if (m) {
+      return {
+        payout: stake * m,
+        multiplier: m,
+        kind: "3x",
+        winSymbol: a,
+        bonusTrigger: false,
+      };
+    }
   }
 
   // Find which symbol appears exactly twice (at most one can in 3 reels if not all same).
@@ -109,10 +153,22 @@ export function resolveSpin(
 
   if (pairSymbol && pairSymbol in PAYTABLE.pair) {
     const m = PAYTABLE.pair[pairSymbol]!;
-    return { payout: stake * m, multiplier: m, kind: "2x", winSymbol: pairSymbol };
+    return {
+      payout: stake * m,
+      multiplier: m,
+      kind: "2x",
+      winSymbol: pairSymbol,
+      bonusTrigger: false,
+    };
   }
 
-  return { payout: 0, multiplier: 0, kind: "none", winSymbol: null };
+  return {
+    payout: 0,
+    multiplier: 0,
+    kind: "none",
+    winSymbol: null,
+    bonusTrigger: false,
+  };
 }
 
 // Stake bounds — single source of truth for validation + UI.
@@ -133,3 +189,10 @@ export const MAX_SLOT_DEBT = 500;
 // face-down cards hides the Ferumbras. Right = winnings double; wrong = lose it.
 export const GAMBLE_CARDS = 2;
 export const MAX_GAMBLE_ROUNDS = 5;
+
+// Free-spin bonus: 3 jokers on a single spin award FREE_SPINS_AWARDED spins
+// with the triggering stake locked. Retriggers add more. All wins during the
+// bonus round are multiplied by FREE_SPIN_WIN_MULTIPLIER.
+export const FREE_SPIN_TRIGGER_COUNT = 3;
+export const FREE_SPINS_AWARDED = 10;
+export const FREE_SPIN_WIN_MULTIPLIER = 2;

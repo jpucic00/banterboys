@@ -47,6 +47,7 @@ export default function SlotReel({
   reelIndex,
   winning = false,
   jackpot = false,
+  bonus = false,
 }: {
   target: SlotSymbol | null;
   durationMs: number;
@@ -57,6 +58,8 @@ export default function SlotReel({
   winning?: boolean;
   /** True for the special jackpot animation. */
   jackpot?: boolean;
+  /** True when the middle row is the joker bonus trigger. */
+  bonus?: boolean;
 }) {
   const stripRef = useRef<HTMLDivElement>(null);
   const [strip, setStrip] = useState<SlotSymbol[]>(() =>
@@ -122,9 +125,11 @@ export default function SlotReel({
                   // Finite iteration count instead of "infinite" so the GPU
                   // isn't driving this forever after the player walks away.
                   animation: pulse
-                    ? jackpot
-                      ? "slots-symbol-pulse-jackpot 0.8s ease-in-out 6"
-                      : "slots-symbol-pulse 0.9s ease-in-out 5"
+                    ? bonus
+                      ? "slots-symbol-pulse-bonus 0.9s ease-in-out 6"
+                      : jackpot
+                        ? "slots-symbol-pulse-jackpot 0.8s ease-in-out 6"
+                        : "slots-symbol-pulse 0.9s ease-in-out 5"
                     : undefined,
                   transformOrigin: "center",
                 }}

@@ -1,0 +1,6 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "activeFreeSpins" INTEGER NOT NULL DEFAULT 0,
+ADD COLUMN     "freeSpinStake" DOUBLE PRECISION NOT NULL DEFAULT 0;
+
+-- AlterTable
+ALTER TABLE "SlotSpin" ADD COLUMN     "isFreeSpin" BOOLEAN NOT NULL DEFAULT false;

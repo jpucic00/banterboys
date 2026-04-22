@@ -9,6 +9,7 @@ export default async function SlotsPage() {
 
   let initialSaldo = { saldoTibiaCoins: 0 };
   let initialGamble = { activeGambleAmount: 0, activeGambleRounds: 0 };
+  let initialFreeSpin = { activeFreeSpins: 0, freeSpinStake: 0 };
   if (session?.user?.id) {
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
@@ -16,6 +17,8 @@ export default async function SlotsPage() {
         saldoTibiaCoins: true,
         activeGambleAmount: true,
         activeGambleRounds: true,
+        activeFreeSpins: true,
+        freeSpinStake: true,
       },
     });
     if (user) {
@@ -23,6 +26,10 @@ export default async function SlotsPage() {
       initialGamble = {
         activeGambleAmount: user.activeGambleAmount,
         activeGambleRounds: user.activeGambleRounds,
+      };
+      initialFreeSpin = {
+        activeFreeSpins: user.activeFreeSpins,
+        freeSpinStake: user.freeSpinStake,
       };
     }
   }
@@ -38,6 +45,7 @@ export default async function SlotsPage() {
       multiplier: true,
       symbols: true,
       currency: true,
+      isFreeSpin: true,
       createdAt: true,
       user: { select: { name: true, alias: true, image: true } },
     },
@@ -48,6 +56,7 @@ export default async function SlotsPage() {
       isLoggedIn={!!session?.user?.id}
       initialSaldo={initialSaldo}
       initialGamble={initialGamble}
+      initialFreeSpin={initialFreeSpin}
       initialSpins={initialSpins}
       currentUser={
         session?.user
