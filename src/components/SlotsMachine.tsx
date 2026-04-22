@@ -723,67 +723,6 @@ function SlotCabinet({
           }}
         />
       </div>
-
-      {/* Coin rain spans the full cabinet so coins fall the entire height. */}
-      {isWin && resultKey && (
-        <CoinRain
-          key={resultKey}
-          intensity={isJackpot ? "jackpot" : isBigWin ? "big" : "small"}
-        />
-      )}
-    </div>
-  );
-}
-
-function CoinRain({
-  intensity,
-}: {
-  intensity: "small" | "big" | "jackpot";
-}) {
-  const count = intensity === "jackpot" ? 30 : intensity === "big" ? 20 : 14;
-  const sprite = "/tibia/crystal_coin.webp";
-
-  // Deterministic pseudo-random placement so SSR/CSR match and it looks varied.
-  const coins = Array.from({ length: count }, (_, i) => {
-    const seed = ((i + 1) * 2654435761) >>> 0;
-    const leftPct = ((seed >>> 8) % 92) + 4; // 4–95%
-    const delayMs = (((seed >>> 16) & 0x3ff) % 700) + i * 35; // staggered trailing
-    const size = 26 + (((seed >>> 2) & 7) * 2); // 26–40px
-    const durationMs = 1100 + ((seed >>> 5) & 0x1ff); // 1100–1600ms
-    return { leftPct, delayMs, size, durationMs };
-  });
-
-  return (
-    <div
-      className="pointer-events-none absolute"
-      style={{
-        left: 0,
-        right: 0,
-        top: 0,
-        bottom: 0,
-        zIndex: 20,
-      }}
-    >
-      {coins.map((c, i) => (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          key={i}
-          src={sprite}
-          alt=""
-          width={c.size}
-          height={c.size}
-          style={{
-            position: "absolute",
-            top: 0,
-            left: `${c.leftPct}%`,
-            marginLeft: -c.size / 2,
-            imageRendering: "pixelated",
-            animation: `slots-coin-fall ${c.durationMs}ms ${c.delayMs}ms cubic-bezier(0.55, 0, 0.75, 0.3) forwards`,
-            opacity: 0,
-            filter: "drop-shadow(0 2px 3px rgba(0, 0, 0, 0.8))",
-          }}
-        />
-      ))}
     </div>
   );
 }

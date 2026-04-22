@@ -78,23 +78,6 @@ body {
   }
 }
 
-@keyframes slots-coin-fall {
-  0% {
-    transform: translateY(-30px) rotate(0deg);
-    opacity: 0;
-  }
-  8% {
-    opacity: 1;
-  }
-  92% {
-    opacity: 1;
-  }
-  100% {
-    transform: translateY(320px) rotate(720deg);
-    opacity: 0;
-  }
-}
-
 @keyframes slots-cabinet-shake {
   0%, 100% { transform: translate3d(0, 0, 0); }
   10%, 30%, 50%, 70%, 90% { transform: translate3d(-3px, 0, 0); }
