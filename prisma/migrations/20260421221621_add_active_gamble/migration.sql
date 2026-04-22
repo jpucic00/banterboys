@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "User" ADD COLUMN     "activeGambleAmount" DOUBLE PRECISION NOT NULL DEFAULT 0,
+ADD COLUMN     "activeGambleRounds" INTEGER NOT NULL DEFAULT 0;

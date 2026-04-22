@@ -119,10 +119,12 @@ export default function SlotReel({
                 height={52}
                 style={{
                   imageRendering: "pixelated",
+                  // Finite iteration count instead of "infinite" so the GPU
+                  // isn't driving this forever after the player walks away.
                   animation: pulse
                     ? jackpot
-                      ? "slots-symbol-pulse-jackpot 0.8s ease-in-out infinite"
-                      : "slots-symbol-pulse 0.9s ease-in-out infinite"
+                      ? "slots-symbol-pulse-jackpot 0.8s ease-in-out 6"
+                      : "slots-symbol-pulse 0.9s ease-in-out 5"
                     : undefined,
                   transformOrigin: "center",
                 }}

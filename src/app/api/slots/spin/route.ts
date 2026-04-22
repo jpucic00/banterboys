@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
   const symbolsStr = symbols.join(",");
 
   try {
-    const { newBalance, spinId } = await prisma.$transaction(async (tx) => {
+    const { newBalance, spinId, activeGambleAmount } = await prisma.$transaction(async (tx) => {
       // Balance is allowed to go negative — house tracks the debt via saldo
       // until it's paid off in-game. But cap the slot-side debt at MAX_SLOT_DEBT
       // so losses can't spiral indefinitely.
@@ -87,9 +87,19 @@ export async function POST(req: NextRequest) {
         throw new Error("DEBT_LIMIT");
       }
 
+      // Any pending gamble from a previous spin is auto-collected here (the
+      // winnings were already credited at that spin, so there's no balance
+      // change — just clear the active-gamble state).
+      // Gamble seed is the full payout (stake + profit), matching how classic
+      // slot gamble features work: you risk everything you just won.
+      const gambleSeed = payout > 0 ? payout : 0;
       const updated = await tx.user.update({
         where: { id: userId },
-        data: { saldoTibiaCoins: { increment: net } },
+        data: {
+          saldoTibiaCoins: { increment: net },
+          activeGambleAmount: gambleSeed,
+          activeGambleRounds: 0,
+        },
         select: { saldoTibiaCoins: true },
       });
 
@@ -105,7 +115,11 @@ export async function POST(req: NextRequest) {
         select: { id: true },
       });
 
-      return { newBalance: updated.saldoTibiaCoins, spinId: spin.id };
+      return {
+        newBalance: updated.saldoTibiaCoins,
+        spinId: spin.id,
+        activeGambleAmount: gambleSeed,
+      };
     });
 
     // Big-win Discord ping. Fire and forget — never blocks the response.
@@ -130,6 +144,8 @@ export async function POST(req: NextRequest) {
       payout,
       multiplier,
       newBalance,
+      activeGambleAmount,
+      activeGambleRounds: 0,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown";

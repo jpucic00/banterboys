@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from "react";
 import { signIn } from "next-auth/react";
-import { useRouter } from "next/navigation";
 import Image from "next/image";
 import SlotReel, { CELL, PADDING } from "./SlotReel";
 import { CoinAmount } from "./CoinIcon";
@@ -14,6 +13,8 @@ import {
   STAKE_LIMITS,
   BIG_WIN_MULTIPLIER,
   MAX_SLOT_DEBT,
+  GAMBLE_CARDS,
+  MAX_GAMBLE_ROUNDS,
 } from "@/lib/slots";
 
 type SpinUser = {
@@ -39,6 +40,24 @@ type SpinResponse = {
   payout: number;
   multiplier: number;
   newBalance: number;
+  activeGambleAmount: number;
+  activeGambleRounds: number;
+};
+
+type GambleResponse = {
+  won: boolean;
+  winIndex: number;
+  amountAtRisk: number;
+  newBalance: number;
+  activeGambleAmount: number;
+  activeGambleRounds: number;
+};
+
+type GambleReveal = {
+  pickIndex: number;
+  winIndex: number;
+  won: boolean;
+  amountAtRisk: number;
 };
 
 const REEL_DURATIONS = [1400, 1700, 2000];
@@ -60,16 +79,16 @@ function deriveWinningPositions(
 export default function SlotsMachine({
   isLoggedIn,
   initialSaldo,
+  initialGamble,
   initialSpins,
   currentUser,
 }: {
   isLoggedIn: boolean;
   initialSaldo: { saldoTibiaCoins: number };
+  initialGamble: { activeGambleAmount: number; activeGambleRounds: number };
   initialSpins: SpinHistoryItem[];
   currentUser: SpinUser | null;
 }) {
-  const router = useRouter();
-
   const presets = STAKE_LIMITS.TIBIA_COINS.presets;
   const [stakeInput, setStakeInput] = useState<string>(String(presets[0]));
   const stake = Math.max(0, Math.floor(Number(stakeInput) || 0));
@@ -80,11 +99,23 @@ export default function SlotsMachine({
   const [resultVisible, setResultVisible] = useState(false);
   const [history, setHistory] = useState<SpinHistoryItem[]>(initialSpins);
 
+  // Double-or-nothing gamble state
+  const [gambleAmount, setGambleAmount] = useState<number>(
+    initialGamble.activeGambleAmount
+  );
+  const [gambleRounds, setGambleRounds] = useState<number>(
+    initialGamble.activeGambleRounds
+  );
+  const [gambling, setGambling] = useState(false);
+  const [gambleReveal, setGambleReveal] = useState<GambleReveal | null>(null);
+
   const revealTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const gambleRevealTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
       if (revealTimer.current) clearTimeout(revealTimer.current);
+      if (gambleRevealTimer.current) clearTimeout(gambleRevealTimer.current);
     };
   }, []);
 
@@ -110,6 +141,12 @@ export default function SlotsMachine({
     setError(null);
     setResultVisible(false);
     setSpinning(true);
+    // Any pending gamble is auto-collected server-side when a new spin begins;
+    // reset the client state immediately so the gamble UI disappears.
+    if (gambleRevealTimer.current) clearTimeout(gambleRevealTimer.current);
+    setGambleReveal(null);
+    setGambleAmount(0);
+    setGambleRounds(0);
 
     try {
       const res = await fetch("/api/slots/spin", {
@@ -128,10 +165,12 @@ export default function SlotsMachine({
       const data = (await res.json()) as SpinResponse;
       setLastResult(data);
 
-      // Let the last reel finish before updating balance / flipping UI / showing banner
+      // Let the last reel finish before updating balance / flipping UI / showing banner.
       if (revealTimer.current) clearTimeout(revealTimer.current);
       revealTimer.current = setTimeout(() => {
         setBalance(data.newBalance);
+        setGambleAmount(data.activeGambleAmount);
+        setGambleRounds(data.activeGambleRounds);
         setSpinning(false);
         setResultVisible(true);
         // Add to local history (prepend the current user's spin)
@@ -150,13 +189,91 @@ export default function SlotsMachine({
             ...h,
           ].slice(0, 10)
         );
-        // Refresh server data so balance stays accurate after nav
-        router.refresh();
       }, LAST_REEL_DURATION + 60);
     } catch (e) {
       console.error(e);
       setError("Network error.");
       setSpinning(false);
+    }
+  }
+
+  async function handleGamble(pickIndex: number) {
+    if (gambling || spinning) return;
+    if (gambleAmount <= 0 || gambleRounds >= MAX_GAMBLE_ROUNDS) return;
+    setError(null);
+    setGambling(true);
+
+    try {
+      const res = await fetch("/api/slots/gamble", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pickIndex }),
+      });
+
+      if (!res.ok) {
+        const data = await res
+          .json()
+          .catch(() => ({ error: "Gamble failed." }));
+        setError(data.error ?? "Gamble failed.");
+        setGambling(false);
+        return;
+      }
+
+      const data = (await res.json()) as GambleResponse;
+      setGambleReveal({
+        pickIndex,
+        winIndex: data.winIndex,
+        won: data.won,
+        amountAtRisk: data.amountAtRisk,
+      });
+
+      // After the flip+reveal animation, commit the new balance/amount state.
+      if (gambleRevealTimer.current) clearTimeout(gambleRevealTimer.current);
+      gambleRevealTimer.current = setTimeout(() => {
+        setBalance(data.newBalance);
+        setGambleAmount(data.activeGambleAmount);
+        setGambleRounds(data.activeGambleRounds);
+        setGambling(false);
+        // Keep the reveal visible briefly, then reset so the player can
+        // either gamble again (cards reset face-down) or collect.
+        if (gambleRevealTimer.current) clearTimeout(gambleRevealTimer.current);
+        gambleRevealTimer.current = setTimeout(
+          () => setGambleReveal(null),
+          1600
+        );
+      }, 700);
+    } catch (e) {
+      console.error(e);
+      setError("Network error.");
+      setGambling(false);
+    }
+  }
+
+  async function handleCollect() {
+    if (gambling || spinning || gambleAmount <= 0) return;
+    setError(null);
+    setGambling(true);
+    try {
+      const res = await fetch("/api/slots/collect", { method: "POST" });
+      if (!res.ok) {
+        setError("Failed to collect.");
+        setGambling(false);
+        return;
+      }
+      const data = (await res.json()) as {
+        newBalance: number;
+        activeGambleAmount: number;
+        activeGambleRounds: number;
+      };
+      setBalance(data.newBalance);
+      setGambleAmount(data.activeGambleAmount);
+      setGambleRounds(data.activeGambleRounds);
+      setGambleReveal(null);
+      setGambling(false);
+    } catch (e) {
+      console.error(e);
+      setError("Network error.");
+      setGambling(false);
     }
   }
 
@@ -313,6 +430,18 @@ export default function SlotsMachine({
             </div>
           )}
         </div>
+
+        {/* Double-or-nothing gamble panel */}
+        {gambleAmount > 0 && (
+          <GamblePanel
+            amount={gambleAmount}
+            rounds={gambleRounds}
+            gambling={gambling}
+            reveal={gambleReveal}
+            onPick={handleGamble}
+            onCollect={handleCollect}
+          />
+        )}
 
         {/* Stake controls */}
         <div className="flex flex-wrap items-end gap-3 justify-center">
@@ -655,6 +784,197 @@ function CoinRain({
           }}
         />
       ))}
+    </div>
+  );
+}
+
+function GamblePanel({
+  amount,
+  rounds,
+  gambling,
+  reveal,
+  onPick,
+  onCollect,
+}: {
+  amount: number;
+  rounds: number;
+  gambling: boolean;
+  reveal: GambleReveal | null;
+  onPick: (pickIndex: number) => void;
+  onCollect: () => void;
+}) {
+  const atMaxRounds = rounds >= MAX_GAMBLE_ROUNDS;
+  const nextAmount = amount * 2;
+
+  return (
+    <div
+      className="rounded-md p-4 mb-3 space-y-3"
+      style={{
+        background:
+          "linear-gradient(to bottom, #1a1224 0%, #0f0a18 100%)",
+        border: "1px solid #A855F744",
+        boxShadow: "0 0 18px rgba(168, 85, 247, 0.15)",
+      }}
+    >
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <div
+            className="text-[10px] font-bold uppercase tracking-widest"
+            style={{ color: "#A855F7" }}
+          >
+            Double or Nothing
+          </div>
+          <div className="text-sm text-text-secondary mt-0.5">
+            {reveal
+              ? reveal.won
+                ? "Correct! Gamble again or collect."
+                : "Wrong card — you lost it."
+              : atMaxRounds
+                ? "Max rounds reached. Collect your winnings!"
+                : "Pick the Ferumbras to double your winnings."}
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-[10px] uppercase tracking-wide text-text-muted">
+            Round {Math.min(rounds + 1, MAX_GAMBLE_ROUNDS)} / {MAX_GAMBLE_ROUNDS}
+          </div>
+          <div className="flex items-center justify-end gap-3 mt-0.5 text-xs font-mono">
+            <span className="text-text-muted">
+              at risk{" "}
+              <span style={{ color: "#F0A818" }}>
+                <CoinAmount amount={amount} currency="TIBIA_COINS" size={12} />
+              </span>
+            </span>
+            {!atMaxRounds && (
+              <span className="text-text-muted">
+                win{" "}
+                <span style={{ color: "#00c853" }}>
+                  <CoinAmount
+                    amount={nextAmount}
+                    currency="TIBIA_COINS"
+                    size={12}
+                  />
+                </span>
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Cards */}
+      <div className="flex items-center justify-center gap-3">
+        {Array.from({ length: GAMBLE_CARDS }).map((_, i) => {
+          const isRevealed = reveal !== null;
+          const isPicked = reveal?.pickIndex === i;
+          const isWinCard = reveal?.winIndex === i;
+          const clickable = !gambling && !isRevealed && !atMaxRounds;
+
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onPick(i)}
+              disabled={!clickable}
+              aria-label={`Card ${i + 1}`}
+              className={`slots-gamble-card ${isRevealed ? "slots-gamble-card-flipped" : ""}`}
+              style={{
+                width: 76,
+                height: 100,
+                padding: 0,
+                background: "transparent",
+                border: "none",
+                cursor: clickable ? "pointer" : "default",
+                transform: isPicked && !isRevealed ? "translateY(-4px)" : undefined,
+                transition: "transform 0.15s",
+              }}
+            >
+              <div className="slots-gamble-card-inner">
+                {/* Back (face-down) */}
+                <div
+                  className="slots-gamble-card-face"
+                  style={{
+                    background:
+                      "linear-gradient(135deg, #2a1f3a 0%, #1a1224 50%, #2a1f3a 100%)",
+                    boxShadow: isPicked
+                      ? "0 0 14px rgba(168, 85, 247, 0.6)"
+                      : clickable
+                        ? "0 2px 6px rgba(0, 0, 0, 0.5)"
+                        : "0 1px 3px rgba(0, 0, 0, 0.4)",
+                    borderColor: isPicked ? "#A855F7" : "#2e2e2e",
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src="/tibia/black_skull.webp"
+                    alt=""
+                    width={36}
+                    height={36}
+                    style={{
+                      imageRendering: "pixelated",
+                      opacity: 0.35,
+                    }}
+                  />
+                </div>
+                {/* Front (revealed) */}
+                <div
+                  className="slots-gamble-card-face slots-gamble-card-face-front"
+                  style={{
+                    background: isWinCard
+                      ? "linear-gradient(135deg, #F0A818 0%, #8a5d0b 100%)"
+                      : "linear-gradient(135deg, #7a1a1a 0%, #3a0a0a 100%)",
+                    borderColor: isWinCard ? "#FFD044" : "#C62828",
+                    boxShadow: isWinCard
+                      ? "0 0 18px rgba(240, 168, 24, 0.55)"
+                      : "0 2px 6px rgba(0, 0, 0, 0.5)",
+                  }}
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={
+                      isWinCard
+                        ? "/tibia/ferumbras.webp"
+                        : "/tibia/amulet_of_loss.webp"
+                    }
+                    alt=""
+                    width={isWinCard ? 48 : 40}
+                    height={isWinCard ? 48 : 40}
+                    style={{ imageRendering: "pixelated" }}
+                  />
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Collect button */}
+      <div className="flex justify-center">
+        <button
+          type="button"
+          onClick={onCollect}
+          disabled={gambling || !!reveal}
+          style={{
+            background: gambling || !!reveal
+              ? "#2a2a2a"
+              : "linear-gradient(to bottom, #00c853, #00a844)",
+            color: gambling || !!reveal ? "#666" : "#fff",
+            border: "none",
+            borderRadius: 6,
+            padding: "8px 20px",
+            fontSize: 12,
+            fontWeight: 800,
+            letterSpacing: "0.08em",
+            textTransform: "uppercase",
+            cursor: gambling || !!reveal ? "not-allowed" : "pointer",
+            transition: "background 0.15s",
+          }}
+        >
+          Collect{" "}
+          <span style={{ marginLeft: 6 }}>
+            <CoinAmount amount={amount} currency="TIBIA_COINS" size={12} />
+          </span>
+        </button>
+      </div>
     </div>
   );
 }

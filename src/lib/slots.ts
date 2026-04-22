@@ -28,10 +28,10 @@ export const REEL_WEIGHTS: Record<SlotSymbol, number> = {
 };
 
 // Multipliers on stake. 3-of-a-kind always wins over pair.
-// Tuned for ~90% RTP (10% house edge).
+// Tuned for ~91% RTP (9% house edge).
 export const PAYTABLE = {
   threeOfAKind: {
-    snake: 4,
+    snake: 5,
     dragon: 8,
     dragon_lord: 15,
     dark_torturer: 25,
@@ -128,3 +128,8 @@ export const DISCORD_NOTIFY_MULTIPLIER = 20; // >= this triggers a Discord webho
 // Max Tibia Coin debt a player is allowed to carry FROM SLOTS. If a spin would
 // push saldoTibiaCoins below -MAX_SLOT_DEBT, the server rejects it.
 export const MAX_SLOT_DEBT = 500;
+
+// Double-or-nothing gamble after a winning spin: pick which of GAMBLE_CARDS
+// face-down cards hides the Ferumbras. Right = winnings double; wrong = lose it.
+export const GAMBLE_CARDS = 2;
+export const MAX_GAMBLE_ROUNDS = 5;

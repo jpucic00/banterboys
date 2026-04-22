@@ -8,12 +8,23 @@ export default async function SlotsPage() {
   const session = await auth();
 
   let initialSaldo = { saldoTibiaCoins: 0 };
+  let initialGamble = { activeGambleAmount: 0, activeGambleRounds: 0 };
   if (session?.user?.id) {
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
-      select: { saldoTibiaCoins: true },
+      select: {
+        saldoTibiaCoins: true,
+        activeGambleAmount: true,
+        activeGambleRounds: true,
+      },
     });
-    if (user) initialSaldo = user;
+    if (user) {
+      initialSaldo = { saldoTibiaCoins: user.saldoTibiaCoins };
+      initialGamble = {
+        activeGambleAmount: user.activeGambleAmount,
+        activeGambleRounds: user.activeGambleRounds,
+      };
+    }
   }
 
   // Public feed: latest 10 spins across all users.
@@ -36,6 +47,7 @@ export default async function SlotsPage() {
     <SlotsMachine
       isLoggedIn={!!session?.user?.id}
       initialSaldo={initialSaldo}
+      initialGamble={initialGamble}
       initialSpins={initialSpins}
       currentUser={
         session?.user

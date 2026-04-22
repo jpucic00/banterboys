@@ -103,6 +103,11 @@ model User {
   saldoGold       Float     @default(0)
   saldoTibiaCoins Float     @default(0)
 
+  // Double-or-nothing gamble state (slots). activeGambleAmount is the TC
+  // currently "in play" on the gamble; 0 means no gamble pending.
+  activeGambleAmount Float @default(0)
+  activeGambleRounds Int   @default(0)
+
   accounts     Account[]
   sessions     Session[]
   createdBets  PvPBet[]   @relation("BetCreator")
