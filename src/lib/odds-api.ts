@@ -7,6 +7,7 @@ const SPORT_KEYS = [
   "soccer_brazil_campeonato",
   "soccer_spain_la_liga",
   "soccer_germany_bundesliga",
+  "soccer_germany_dfb_pokal",
   "soccer_italy_serie_a",
   "soccer_italy_coppa_italia",
   "soccer_uefa_champs_league",

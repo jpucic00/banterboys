@@ -9,6 +9,7 @@ export const ESPN_SPORT_MAP: Record<string, string> = {
   soccer_brazil_campeonato:                   "soccer/bra.1",
   soccer_spain_la_liga:                       "soccer/esp.1",
   soccer_germany_bundesliga:                  "soccer/ger.1",
+  soccer_germany_dfb_pokal:                   "soccer/ger.dfb_pokal",
   soccer_italy_serie_a:                       "soccer/ita.1",
   soccer_italy_coppa_italia:                  "soccer/ita.coppa_italia",
   soccer_uefa_champs_league:                  "soccer/uefa.champions",

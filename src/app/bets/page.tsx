@@ -53,6 +53,7 @@ const LEAGUE_LABELS: Record<string, string> = {
   soccer_fa_cup:                        "FA Cup",
   soccer_spain_la_liga:                 "La Liga",
   soccer_germany_bundesliga:            "Bundesliga",
+  soccer_germany_dfb_pokal:             "DFB-Pokal",
   soccer_france_ligue_one:              "Ligue 1",
   soccer_italy_serie_a:                 "Serie A",
   soccer_italy_coppa_italia:            "Coppa Italia",
