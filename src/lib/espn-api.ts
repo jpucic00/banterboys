@@ -71,12 +71,18 @@ function resolveLogoUrl(sportKey: string, abbrev?: string, apiLogo?: string): st
   return undefined;
 }
 
-/** ESPN status names that indicate the match went beyond 90 minutes */
+/** ESPN status names that indicate the match went beyond 90 minutes.
+ *  ESPN uses different spellings across leagues (FINAL_AET for DFB-Pokal,
+ *  FINAL_PEN for Coppa Italia). Include all observed variants. */
 const EXTRA_TIME_STATUSES = new Set([
   "STATUS_OVERTIME",
-  "STATUS_FULL_TIME_ET",
+  "STATUS_END_OF_EXTRA_TIME",
   "STATUS_PENALTIES",
+  "STATUS_SHOOTOUT",
+  "STATUS_FULL_TIME_ET",
   "STATUS_FULL_TIME_PEN",
+  "STATUS_FINAL_AET",
+  "STATUS_FINAL_PEN",
 ]);
 
 interface EspnCompetition {
