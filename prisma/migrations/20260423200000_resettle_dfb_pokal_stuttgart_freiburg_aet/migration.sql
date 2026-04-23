@@ -100,11 +100,13 @@ BEGIN
     SET "homeScore" = 1, "awayScore" = 1
     WHERE id = v_event_id;
 
-    -- 7. Re-settle selections on this event (result is a DRAW)
+    -- 7. Re-settle selections on this event (result is a DRAW).
+    --    Cast each CASE branch to SelectionResult — PL/pgSQL infers the CASE
+    --    type from the branches, and text literals would fail the enum assignment.
     UPDATE "TicketSelection"
     SET result = CASE
-        WHEN pick IN ('DRAW', 'HOME_DRAW', 'AWAY_DRAW') THEN 'WON'
-        ELSE 'LOST'
+        WHEN pick IN ('DRAW', 'HOME_DRAW', 'AWAY_DRAW') THEN 'WON'::"SelectionResult"
+        ELSE 'LOST'::"SelectionResult"
     END
     WHERE "eventId" = v_event_id AND result = 'PENDING';
 
