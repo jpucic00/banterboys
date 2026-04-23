@@ -166,6 +166,29 @@ export default function SlotsMachine({
     setBalance(initialSaldo.saldoTibiaCoins);
   }, [initialSaldo.saldoTibiaCoins]);
 
+  // Poll the public feed every 5s so other players' spins show up live.
+  // Skip while the reels are mid-spin so we don't clobber the optimistic
+  // prepend added on spin completion.
+  useEffect(() => {
+    let cancelled = false;
+    const refresh = async () => {
+      if (spinning) return;
+      try {
+        const res = await fetch("/api/slots/feed", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as { spins: SpinHistoryItem[] };
+        if (!cancelled) setHistory(data.spins);
+      } catch {
+        // Ignore — transient network errors will self-heal on the next tick.
+      }
+    };
+    const id = setInterval(refresh, 5000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [spinning]);
+
   const worstCaseBalance = inBonus ? balance : balance - stake;
   // Debt cap doesn't apply to free spins (no stake at risk).
   const debtLimitHit = isLoggedIn && !inBonus && worstCaseBalance < -MAX_SLOT_DEBT;
@@ -1341,7 +1364,28 @@ const TIER_STYLES: Record<
   },
 };
 
+function formatSpinTime(createdAt: Date | string): string {
+  const d = typeof createdAt === "string" ? new Date(createdAt) : createdAt;
+  const diffMs = Date.now() - d.getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 10) return "just now";
+  if (diffSec < 60) return `${diffSec}s ago`;
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
 function RecentSpins({ spins }: { spins: SpinHistoryItem[] }) {
+  // Force a re-render every 15s so relative timestamps ("2m ago") stay fresh
+  // even when the feed payload hasn't changed.
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 15000);
+    return () => clearInterval(id);
+  }, []);
+
   if (spins.length === 0) {
     return (
       <div
@@ -1382,7 +1426,7 @@ function RecentSpins({ spins }: { spins: SpinHistoryItem[] }) {
               }}
             >
               {/* Player */}
-              <div className="flex items-center gap-1.5 min-w-0 flex-shrink-0 w-24 sm:w-32 md:w-40">
+              <div className="flex items-center gap-1.5 min-w-0 flex-shrink-0 w-28 sm:w-36 md:w-44">
                 {s.user.image ? (
                   <Image
                     src={s.user.image}
@@ -1397,23 +1441,33 @@ function RecentSpins({ spins }: { spins: SpinHistoryItem[] }) {
                     style={{ background: "#252525" }}
                   />
                 )}
-                <span className="text-xs text-text-secondary truncate font-medium">
-                  {playerName}
-                </span>
-                {s.isFreeSpin && (
-                  <span
-                    className="font-mono text-[9px] font-bold px-1 py-0.5 rounded shrink-0"
-                    style={{
-                      background: "rgba(168, 85, 247, 0.18)",
-                      color: "#A855F7",
-                      border: "1px solid #A855F7",
-                      letterSpacing: "0.05em",
-                    }}
-                    title="Awarded by the Jester bonus"
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs text-text-secondary truncate font-medium">
+                      {playerName}
+                    </span>
+                    {s.isFreeSpin && (
+                      <span
+                        className="font-mono text-[9px] font-bold px-1 py-0.5 rounded shrink-0"
+                        style={{
+                          background: "rgba(168, 85, 247, 0.18)",
+                          color: "#A855F7",
+                          border: "1px solid #A855F7",
+                          letterSpacing: "0.05em",
+                        }}
+                        title="Awarded by the Jester bonus"
+                      >
+                        FREE
+                      </span>
+                    )}
+                  </div>
+                  <div
+                    className="text-[10px] text-text-muted font-mono"
+                    title={new Date(s.createdAt).toLocaleString()}
                   >
-                    FREE
-                  </span>
-                )}
+                    {formatSpinTime(s.createdAt)}
+                  </div>
+                </div>
               </div>
 
               {/* Reels */}
