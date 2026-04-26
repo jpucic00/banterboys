@@ -8,6 +8,7 @@ import {
   MAX_SLOT_DEBT,
 } from "@/lib/slots";
 import { checkSlotThrottle } from "@/lib/slots-rate-limit";
+import { isBettingDisabled, bettingDisabledResponse } from "@/lib/betting-status";
 
 export const dynamic = "force-dynamic";
 
@@ -21,6 +22,8 @@ export const dynamic = "force-dynamic";
  * was already credited at spin time, so saldo is decremented).
  */
 export async function POST(req: NextRequest) {
+  if (isBettingDisabled()) return bettingDisabledResponse();
+
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -76,6 +79,8 @@ export async function POST(req: NextRequest) {
 
       const amount = user.activeGambleAmount;
 
+      const round = user.activeGambleRounds + 1;
+
       if (won) {
         // Credit the matched amount — winnings double.
         const nextAmount = amount * 2;
@@ -91,6 +96,9 @@ export async function POST(req: NextRequest) {
             activeGambleAmount: true,
             activeGambleRounds: true,
           },
+        });
+        await tx.slotGambleRound.create({
+          data: { userId, amount, won: true, round },
         });
         return {
           won,
@@ -120,6 +128,9 @@ export async function POST(req: NextRequest) {
           activeGambleAmount: true,
           activeGambleRounds: true,
         },
+      });
+      await tx.slotGambleRound.create({
+        data: { userId, amount, won: false, round },
       });
       return {
         won,

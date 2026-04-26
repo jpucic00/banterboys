@@ -113,12 +113,13 @@ model User {
   activeFreeSpins Int   @default(0)
   freeSpinStake   Float @default(0)
 
-  accounts     Account[]
-  sessions     Session[]
-  createdBets  PvPBet[]   @relation("BetCreator")
-  acceptedBets PvPBet[]   @relation("BetAcceptor")
-  tickets      Ticket[]
-  slotSpins    SlotSpin[]
+  accounts      Account[]
+  sessions      Session[]
+  createdBets   PvPBet[]          @relation("BetCreator")
+  acceptedBets  PvPBet[]          @relation("BetAcceptor")
+  tickets       Ticket[]
+  slotSpins     SlotSpin[]
+  gambleRounds  SlotGambleRound[]
 }
 
 model Sport {
@@ -240,9 +241,29 @@ model SlotSpin {
   isFreeSpin Boolean  @default(false) // true if this spin was awarded via the joker bonus
   createdAt  DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id])
+  user         User              @relation(fields: [userId], references: [id])
+  gambleRounds SlotGambleRound[]
 
   @@index([userId])
   @@index([createdAt])
   @@index([multiplier])
+}
+
+// One row per double-or-nothing round resolved on a winning spin.
+// `won = true` means the player doubled (saldo += amount, house -= amount).
+// `won = false` means the player lost (saldo -= amount, house += amount).
+model SlotGambleRound {
+  id        String   @id @default(cuid())
+  userId    String
+  spinId    String? // SlotSpin that seeded this gamble chain (nullable for safety)
+  amount    Float // amount at risk on this round
+  won       Boolean
+  round     Int // 1..MAX_GAMBLE_ROUNDS within the chain
+  createdAt DateTime @default(now())
+
+  user User      @relation(fields: [userId], references: [id])
+  spin SlotSpin? @relation(fields: [spinId], references: [id])
+
+  @@index([userId])
+  @@index([createdAt])
 }

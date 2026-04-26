@@ -54,13 +54,21 @@ type SlotRow = {
   payout: number;
   multiplier: number;
   symbols: string;
+  isFreeSpin: boolean;
+  createdAt: Date;
+};
+
+type GambleRow = {
+  amount: number;
+  won: boolean;
   createdAt: Date;
 };
 
 type SlotStats = {
-  houseProfit: number;       // sum(stake) - sum(payout)
-  totalVolume: number;       // sum(stake)
-  totalPayouts: number;      // sum(payout)
+  houseProfit: number;       // paidVolume - totalPayouts - gambleNet
+  totalVolume: number;       // sum(stake) excluding free spins
+  totalPayouts: number;      // sum(payout) including free spins
+  gambleNet: number;         // sum(amount won) - sum(amount lost) — positive = house loss
   spinCount: number;
   winCount: number;          // spins with payout > 0
   jackpotCount: number;      // 3x ferumbras
@@ -69,7 +77,9 @@ type SlotStats = {
   biggestPayout: number;
   avgStake: number;
   hitRate: number | null;    // winCount / spinCount (percent)
-  actualRTP: number | null;  // totalPayouts / totalVolume (percent)
+  actualRTP: number | null;  // totalPayouts / paidVolume (percent)
+  gambleCount: number;
+  gambleWinCount: number;
 };
 
 function calcTicketStats(tickets: TicketRow[]): TicketStats {
@@ -99,8 +109,12 @@ function calcTicketStats(tickets: TicketRow[]): TicketStats {
   };
 }
 
-function calcSlotStats(spins: SlotRow[]): SlotStats {
-  const totalVolume = spins.reduce((s, x) => s + x.stake, 0);
+function calcSlotStats(spins: SlotRow[], gambles: GambleRow[]): SlotStats {
+  // Free spins record a "phantom stake" on the SlotSpin row (the locked stake
+  // from the trigger) so the multiplier column stays meaningful for analytics.
+  // The user did not actually pay that stake, so exclude it from volume.
+  const paidSpins = spins.filter((x) => !x.isFreeSpin);
+  const paidVolume = paidSpins.reduce((s, x) => s + x.stake, 0);
   const totalPayouts = spins.reduce((s, x) => s + x.payout, 0);
   const winCount = spins.filter((x) => x.payout > 0).length;
   const jackpotCount = spins.filter(
@@ -109,19 +123,28 @@ function calcSlotStats(spins: SlotRow[]): SlotStats {
   const bigWinCount = spins.filter((x) => x.multiplier >= DISCORD_NOTIFY_MULTIPLIER).length;
   const biggestMultiplier = spins.reduce((m, x) => Math.max(m, x.multiplier), 0);
   const biggestPayout = spins.reduce((m, x) => Math.max(m, x.payout), 0);
+  // Net player gain on gambles. Positive => house loss; negative => house gain.
+  const gambleNet = gambles.reduce(
+    (s, g) => s + (g.won ? g.amount : -g.amount),
+    0
+  );
+  const gambleWinCount = gambles.filter((g) => g.won).length;
   return {
-    houseProfit: totalVolume - totalPayouts,
-    totalVolume,
+    houseProfit: paidVolume - totalPayouts - gambleNet,
+    totalVolume: paidVolume,
     totalPayouts,
+    gambleNet,
     spinCount: spins.length,
     winCount,
     jackpotCount,
     bigWinCount,
     biggestMultiplier,
     biggestPayout,
-    avgStake: spins.length > 0 ? totalVolume / spins.length : 0,
+    avgStake: paidSpins.length > 0 ? paidVolume / paidSpins.length : 0,
     hitRate: spins.length > 0 ? (winCount / spins.length) * 100 : null,
-    actualRTP: totalVolume > 0 ? (totalPayouts / totalVolume) * 100 : null,
+    actualRTP: paidVolume > 0 ? (totalPayouts / paidVolume) * 100 : null,
+    gambleCount: gambles.length,
+    gambleWinCount,
   };
 }
 
@@ -164,7 +187,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const day7Ago = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const day30Ago = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  const [allTickets, allPvPBets, allSlotSpins, totalUsers, activeEvents] = await Promise.all([
+  const [allTickets, allPvPBets, allSlotSpins, allGambleRounds, totalUsers, activeEvents] = await Promise.all([
     prisma.ticket.findMany({
       select: { status: true, amount: true, potentialPayout: true, totalOdds: true, currency: true, createdAt: true },
     }),
@@ -172,7 +195,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       select: { status: true, amount: true, joinerAmount: true, currency: true, createdAt: true },
     }),
     prisma.slotSpin.findMany({
-      select: { stake: true, payout: true, multiplier: true, symbols: true, createdAt: true },
+      select: { stake: true, payout: true, multiplier: true, symbols: true, isFreeSpin: true, createdAt: true },
+    }),
+    prisma.slotGambleRound.findMany({
+      select: { amount: true, won: true, createdAt: true },
     }),
     prisma.user.count(),
     prisma.event.count({ where: { status: { in: ["UPCOMING", "LIVE"] } } }),
@@ -181,6 +207,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const tickets = isTrolian ? allTickets.filter((t) => t.createdAt >= trolianCutoff) : allTickets;
   const pvpBets = isTrolian ? allPvPBets.filter((b) => b.createdAt >= trolianCutoff) : allPvPBets;
   const slotSpins = isTrolian ? allSlotSpins.filter((s) => s.createdAt >= trolianCutoff) : allSlotSpins;
+  const gambleRounds = isTrolian ? allGambleRounds.filter((g) => g.createdAt >= trolianCutoff) : allGambleRounds;
 
   const allTime = calcTicketStats(tickets);
   const last30d = calcTicketStats(tickets.filter((t) => t.createdAt >= day30Ago));
@@ -191,9 +218,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const pvpGold = calcPvPStats(pvpBets.filter((b) => b.currency === "GOLD"));
   const pvpTc = calcPvPStats(pvpBets.filter((b) => b.currency === "TIBIA_COINS"));
 
-  const slotsAll = calcSlotStats(slotSpins);
-  const slots30d = calcSlotStats(slotSpins.filter((s) => s.createdAt >= day30Ago));
-  const slots7d = calcSlotStats(slotSpins.filter((s) => s.createdAt >= day7Ago));
+  const slotsAll = calcSlotStats(slotSpins, gambleRounds);
+  const slots30d = calcSlotStats(
+    slotSpins.filter((s) => s.createdAt >= day30Ago),
+    gambleRounds.filter((g) => g.createdAt >= day30Ago)
+  );
+  const slots7d = calcSlotStats(
+    slotSpins.filter((s) => s.createdAt >= day7Ago),
+    gambleRounds.filter((g) => g.createdAt >= day7Ago)
+  );
 
   return (
     <div className="space-y-8">
@@ -347,7 +380,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               label="House Profit"
               value={`${slotsAll.houseProfit >= 0 ? "+" : ""}${fmt(slotsAll.houseProfit)} TC`}
               color={slotsAll.houseProfit >= 0 ? "text-win" : "text-loss"}
-              sub={`${fmt(slotsAll.totalPayouts)} TC paid out`}
+              sub={
+                slotsAll.gambleCount > 0
+                  ? `${fmt(slotsAll.totalPayouts)} TC paid · gamble net ${slotsAll.gambleNet >= 0 ? "+" : ""}${fmt(slotsAll.gambleNet)} TC`
+                  : `${fmt(slotsAll.totalPayouts)} TC paid out`
+              }
             />
             <Stat
               label="Total Volume"
@@ -359,7 +396,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               label="Spins"
               value={String(slotsAll.spinCount)}
               color="text-text-primary"
-              sub={`${slotsAll.winCount} winning`}
+              sub={
+                slotsAll.gambleCount > 0
+                  ? `${slotsAll.winCount} winning · ${slotsAll.gambleCount} gambles (${slotsAll.gambleWinCount} won)`
+                  : `${slotsAll.winCount} winning`
+              }
             />
             <Stat
               label="Hit Rate"
