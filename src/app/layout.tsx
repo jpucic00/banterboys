@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 import Providers from "@/components/Providers";
+import { isBettingDisabled, BETTING_DISABLED_MESSAGE } from "@/lib/betting-status";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -30,6 +31,14 @@ export default function RootLayout({
       >
         <Providers>
           <Navbar />
+          {isBettingDisabled() && (
+            <div
+              role="alert"
+              className="bg-amber-900/40 border-b border-amber-700/60 text-amber-100 text-sm text-center px-4 py-2"
+            >
+              {BETTING_DISABLED_MESSAGE}
+            </div>
+          )}
           <main className="max-w-7xl mx-auto px-4 py-6">{children}</main>
         </Providers>
       </body>

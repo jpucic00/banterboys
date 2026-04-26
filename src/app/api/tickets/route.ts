@@ -5,6 +5,7 @@ import { EventStatus, TicketStatus } from "@prisma/client";
 import { notifyTicketCreated, notifyTicketCancelled } from "@/lib/discord-notify";
 import { adjustSaldo } from "@/lib/saldo";
 import { isAdminEmail } from "@/lib/admin";
+import { isBettingDisabled, bettingDisabledResponse } from "@/lib/betting-status";
 
 export async function GET() {
   const session = await auth();
@@ -28,6 +29,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  if (isBettingDisabled()) return bettingDisabledResponse();
+
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

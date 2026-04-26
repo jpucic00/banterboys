@@ -12,10 +12,13 @@ import {
 } from "@/lib/slots";
 import { checkSlotThrottle } from "@/lib/slots-rate-limit";
 import { notifySlotWin } from "@/lib/discord-notify";
+import { isBettingDisabled, bettingDisabledResponse } from "@/lib/betting-status";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
+  if (isBettingDisabled()) return bettingDisabledResponse();
+
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
