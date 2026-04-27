@@ -302,15 +302,30 @@ export default function HenricusWheelClient({
                     </text>
                   </>
                 ) : (
-                  wheelEntries.map((u, i) => (
-                    <WheelSegment
-                      key={u.id}
-                      index={i}
-                      total={wheelEntries.length}
-                      alias={u.alias}
-                      image={u.image}
-                    />
-                  ))
+                  <>
+                    {/* Pass 1: segment backgrounds + labels */}
+                    {wheelEntries.map((u, i) => (
+                      <WheelSegment
+                        key={u.id}
+                        index={i}
+                        total={wheelEntries.length}
+                        alias={u.alias}
+                        image={u.image}
+                        layer="base"
+                      />
+                    ))}
+                    {/* Pass 2: avatars on top of all labels */}
+                    {wheelEntries.map((u, i) => (
+                      <WheelSegment
+                        key={u.id + "-avatar"}
+                        index={i}
+                        total={wheelEntries.length}
+                        alias={u.alias}
+                        image={u.image}
+                        layer="avatar"
+                      />
+                    ))}
+                  </>
                 )}
                 {/* Outer rim — drawn last so it covers segment edges */}
                 <circle
@@ -560,11 +575,13 @@ function WheelSegment({
   total,
   alias,
   image,
+  layer,
 }: {
   index: number;
   total: number;
   alias: string;
   image: string | null;
+  layer: "base" | "avatar";
 }) {
   const r = 95;
   const segDeg = 360 / total;
@@ -615,7 +632,7 @@ function WheelSegment({
   const firstChar = (alias.match(/[A-Za-z0-9]/) || [""])[0]?.toUpperCase() || "?";
   const clipId = `henricus-avatar-clip-${index}`;
 
-  return (
+  if (layer === "base") return (
     <g>
       <path
         d={slicePath}
@@ -625,7 +642,6 @@ function WheelSegment({
         strokeOpacity={0.55}
         strokeLinejoin="round"
       />
-
       <text
         x={lx}
         y={ly}
@@ -645,7 +661,12 @@ function WheelSegment({
       >
         {display}
       </text>
+    </g>
+  );
 
+  // layer === "avatar"
+  return (
+    <g>
       {image ? (
         <>
           <defs>
