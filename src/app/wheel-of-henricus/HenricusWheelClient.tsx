@@ -221,6 +221,13 @@ export default function HenricusWheelClient({
   const canSpin =
     state.user.isLoggedIn && state.user.spinsRemaining > 0 && !debtBlocked && !spinning;
 
+  const revealedUser = reveal
+    ? state.eligibleUsers.find((u) => u.alias === reveal.assignedAlias)
+    : null;
+  const revealFirstChar = reveal
+    ? (reveal.assignedAlias.match(/[A-Za-z0-9]/) || [""])[0]?.toUpperCase() || "?"
+    : "?";
+
   return (
     <div className="space-y-8">
       {settlementToast && (
@@ -527,6 +534,21 @@ export default function HenricusWheelClient({
           >
             <div className="text-xs uppercase tracking-widest text-text-muted">
               You drew
+            </div>
+            <div className="mt-4 flex justify-center">
+              {revealedUser?.image ? (
+                <Image
+                  src={revealedUser.image}
+                  alt=""
+                  width={96}
+                  height={96}
+                  className="rounded-full ring-2 ring-[#F0A818] shadow-[0_0_20px_#F0A81866]"
+                />
+              ) : (
+                <div className="w-24 h-24 rounded-full bg-[#1a140c] ring-2 ring-[#F0A818] shadow-[0_0_20px_#F0A81866] flex items-center justify-center text-[#F0A818] text-3xl font-bold">
+                  {revealFirstChar}
+                </div>
+              )}
             </div>
             <div className="mt-3 text-4xl text-[#F0A818] font-serif drop-shadow-[0_0_12px_#F0A81866]">
               {reveal.assignedAlias}
