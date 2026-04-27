@@ -79,7 +79,7 @@ export default async function HenricusHistoryPage({
             <thead className="bg-[#141414] border-b border-border">
               <tr className="text-left text-xs uppercase tracking-widest text-text-muted">
                 <th className="px-4 py-3">Round ended</th>
-                <th className="px-4 py-3">Fallen</th>
+                <th className="px-4 py-3">Dead</th>
                 <th className="px-4 py-3">Cause</th>
                 <th className="px-4 py-3">Spins</th>
                 <th className="px-4 py-3">Winners</th>

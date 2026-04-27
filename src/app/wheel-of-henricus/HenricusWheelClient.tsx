@@ -278,7 +278,7 @@ export default function HenricusWheelClient({
               ③ Win the bounty
             </div>
             <p className="text-sm text-text-secondary leading-relaxed">
-              If your assigned character is the one who falls, you win{" "}
+              If your assigned character is the one who dies, you win{" "}
               <span className="text-odds-green font-mono">
                 {SPIN_PAYOUT} TC
               </span>
@@ -422,7 +422,7 @@ export default function HenricusWheelClient({
             </h1>
             <p className="text-[10px] text-text-muted leading-tight mt-1">
               {SPIN_STAKE} TC spin · win{" "}
-              <span className="text-[#F0A818]">{SPIN_PAYOUT} TC</span> if your character falls
+              <span className="text-[#F0A818]">{SPIN_PAYOUT} TC</span> if your character dies
             </p>
           </div>
 
@@ -432,7 +432,7 @@ export default function HenricusWheelClient({
               {SPIN_STAKE} TC
             </div>
             <div className="text-[10px] text-text-muted mt-2 uppercase tracking-widest">
-              Win if your character falls
+              Win if your character dies
             </div>
             <div className="text-2xl text-odds-green font-mono font-semibold mt-0.5 drop-shadow-[0_0_4px_#7ddc2c44]">
               {SPIN_PAYOUT} TC

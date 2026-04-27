@@ -606,10 +606,10 @@ export async function notifyHenricusSettled(p: {
 
   const noWinners = p.winners.length === 0;
   const description = noWinners
-    ? `💀 **${p.deadAlias}** has fallen at level ${p.deathLevel} to ${p.deathReason}. ${deadTag} was nobody's champion this round — and the Wheel of Henricus took its victim anyway. The house keeps the pot.`
+    ? `💀 **${p.deadAlias}** has died at level ${p.deathLevel} to ${p.deathReason}. ${deadTag} was nobody's champion this round — and the Wheel of Henricus took its victim anyway. The house keeps the pot.`
     : p.winners.length === 1
-      ? `**${p.deadAlias}** fell at level ${p.deathLevel} to ${p.deathReason}. The wheel called it. ${winnerTags} read it right and the house pays out **${p.totalPayout.toLocaleString()} TC**. ${deadTag}, condolences — Henricus has your blessing on standby.`
-      : `**${p.deadAlias}** fell at level ${p.deathLevel} to ${p.deathReason}. The wheel called it — and ${p.winners.length} spinners saw it coming. ${winnerTags} each collect **500 TC** from the house's purse. ${deadTag}, condolences — Henricus has your blessing on standby.`;
+      ? `**${p.deadAlias}** died at level ${p.deathLevel} to ${p.deathReason}. The wheel called it. ${winnerTags} read it right and the house pays out **${p.totalPayout.toLocaleString()} TC**. ${deadTag}, condolences — Henricus has your blessing on standby.`
+      : `**${p.deadAlias}** died at level ${p.deathLevel} to ${p.deathReason}. The wheel called it — and ${p.winners.length} spinners saw it coming. ${winnerTags} each collect **500 TC** from the house's purse. ${deadTag}, condolences — Henricus has your blessing on standby.`;
 
   const allowedUserIds = [
     ...p.winners.map((w) => w.discordId).filter((id): id is string => !!id),
