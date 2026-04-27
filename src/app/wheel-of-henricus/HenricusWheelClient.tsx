@@ -608,10 +608,16 @@ function WheelSegment({
   const lx = q(labelR * Math.cos(toRad(midA)));
   const ly = q(labelR * Math.sin(toRad(midA)));
   const avatarR = 80;
+  const avatarRadius = 7;
   const ax = q(avatarR * Math.cos(toRad(midA)));
   const ay = q(avatarR * Math.sin(toRad(midA)));
 
-  const maxChars = Math.max(6, Math.floor(300 / total));
+  // Trim text so it never enters the avatar zone. textAnchor=middle means the
+  // text extends ±halfWidth from the anchor. The outward edge must stay ≤
+  // (avatarR - avatarRadius - 2) to leave a 2-unit gap before the icon.
+  const charWidth = 3.3; // approximate SVG units per char at fontSize 5.5
+  const halfRoom = avatarR - avatarRadius - 2 - labelR;
+  const maxChars = Math.max(4, Math.floor((halfRoom * 2) / charWidth));
   const display = alias.length > maxChars ? alias.slice(0, maxChars - 1) + "…" : alias;
   // Alternating wedge tones; if odd-count, force last wedge to a third tone
   // so segments 0 and N-1 don't share a fill at the seam.
@@ -671,22 +677,22 @@ function WheelSegment({
         <>
           <defs>
             <clipPath id={clipId}>
-              <circle cx={ax} cy={ay} r={9} />
+              <circle cx={ax} cy={ay} r={avatarRadius} />
             </clipPath>
           </defs>
           <image
             href={image}
-            x={ax - 9}
-            y={ay - 9}
-            width={18}
-            height={18}
+            x={ax - avatarRadius}
+            y={ay - avatarRadius}
+            width={avatarRadius * 2}
+            height={avatarRadius * 2}
             clipPath={`url(#${clipId})`}
             preserveAspectRatio="xMidYMid slice"
           />
         </>
       ) : (
         <>
-          <circle cx={ax} cy={ay} r={9} fill="#1a140c" />
+          <circle cx={ax} cy={ay} r={avatarRadius} fill="#1a140c" />
           <text
             x={ax}
             y={ay}
@@ -704,7 +710,7 @@ function WheelSegment({
       <circle
         cx={ax}
         cy={ay}
-        r={9}
+        r={avatarRadius}
         fill="none"
         stroke="#F0A818"
         strokeWidth={0.6}
