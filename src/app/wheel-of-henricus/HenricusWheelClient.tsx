@@ -170,18 +170,18 @@ export default function HenricusWheelClient({
       }
 
       // Compute target rotation so the pointer lands on the assigned alias.
+      // Pointer is at the top (12 o'clock); add 6 full rotations for drama.
+      // Always grow rotation forward — never reset — so each spin animates
+      // smoothly from the wheel's current resting position.
       const idx = wheelEntries.findIndex((u) => u.alias === json.assignedAlias);
       const segCount = Math.max(1, wheelEntries.length);
       const segDeg = 360 / segCount;
-      // Pointer is at the top (12 o'clock). Add 6 full rotations for drama.
-      const target = 360 * 6 + (idx >= 0 ? -(idx * segDeg) - segDeg / 2 : 0);
-      // Reset to baseline 0..360 before re-targeting so each spin animates.
-      const normalized = rotation % 360;
-      setRotation(normalized); // immediate snap
-      requestAnimationFrame(() => {
-        // Tiny defer so the snap commits before we set the new target.
-        setRotation(target);
-      });
+      const desiredAtRest = idx >= 0 ? -(idx * segDeg) - segDeg / 2 : 0;
+      const currentMod = ((rotation % 360) + 360) % 360;
+      const desiredMod = ((desiredAtRest % 360) + 360) % 360;
+      const delta = (desiredMod - currentMod + 360) % 360;
+      const target = rotation + delta + 360 * 6;
+      setRotation(target);
 
       window.setTimeout(() => {
         setReveal(json);

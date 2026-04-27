@@ -25,11 +25,15 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, skipped: "empty-frame" });
   }
 
-  const spins = await prisma.henricusSpin.findMany({
-    where: { frameId: frame.id },
-    select: { assignedAlias: true },
+  // Check every alias on the wheel — not just ones with bets — so a non-champion
+  // death still settles the frame and the house keeps the unmatched stakes.
+  const wheelUsers = await prisma.user.findMany({
+    where: { alias: { not: null } },
+    select: { alias: true },
   });
-  const uniqueAliases = Array.from(new Set(spins.map((s) => s.assignedAlias)));
+  const uniqueAliases = Array.from(
+    new Set(wheelUsers.map((u) => u.alias as string))
+  );
 
   // Fetch with bounded concurrency (5 at a time) so we don't blast TibiaData.
   type Match = { alias: string; time: Date; level: number; reason: string };
@@ -156,20 +160,46 @@ export async function GET(req: NextRequest) {
   }
 
   // Fire-and-forget Discord notification — never blocks the response.
-  const deadAssigned = settlement.winningSpins[0]?.assigned;
-  notifyHenricusSettled({
-    deadAlias: settlement.deadAlias,
-    deadDisplay: deadAssigned?.alias ?? deadAssigned?.name ?? settlement.deadAlias,
-    deadDiscordId: deadAssigned?.accounts[0]?.providerAccountId ?? null,
-    deathLevel: settlement.deathLevel,
-    deathReason: settlement.deathReason,
-    totalPayout: settlement.totalPayout,
-    frameSpinCount: frame.totalSpinCount,
-    winners: settlement.winningSpins.map((s) => ({
-      displayName: s.spinner.alias ?? s.spinner.name ?? "Unknown",
-      discordId: s.spinner.accounts[0]?.providerAccountId ?? null,
-    })),
-  }).catch(() => {});
+  (async () => {
+    let deadDisplay = settlement.deadAlias;
+    let deadDiscordId: string | null = null;
+    const deadAssigned = settlement.winningSpins[0]?.assigned;
+    if (deadAssigned) {
+      deadDisplay = deadAssigned.alias ?? deadAssigned.name ?? settlement.deadAlias;
+      deadDiscordId = deadAssigned.accounts[0]?.providerAccountId ?? null;
+    } else {
+      // No winning spins — look up the dead user directly so we can still @mention them.
+      const dead = await prisma.user.findFirst({
+        where: { alias: settlement.deadAlias },
+        select: {
+          name: true,
+          alias: true,
+          accounts: {
+            where: { provider: "discord" },
+            select: { providerAccountId: true },
+          },
+        },
+      });
+      if (dead) {
+        deadDisplay = dead.alias ?? dead.name ?? settlement.deadAlias;
+        deadDiscordId = dead.accounts[0]?.providerAccountId ?? null;
+      }
+    }
+
+    await notifyHenricusSettled({
+      deadAlias: settlement.deadAlias,
+      deadDisplay,
+      deadDiscordId,
+      deathLevel: settlement.deathLevel,
+      deathReason: settlement.deathReason,
+      totalPayout: settlement.totalPayout,
+      frameSpinCount: frame.totalSpinCount,
+      winners: settlement.winningSpins.map((s) => ({
+        displayName: s.spinner.alias ?? s.spinner.name ?? "Unknown",
+        discordId: s.spinner.accounts[0]?.providerAccountId ?? null,
+      })),
+    });
+  })().catch(() => {});
 
   return NextResponse.json({
     ok: true,

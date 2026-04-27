@@ -563,6 +563,30 @@ export async function notifyTicketSettled(
   });
 }
 
+export async function notifyHenricusChampionSelected(p: {
+  spinnerDisplayName: string;
+  spinnerDiscordId: string | null;
+  championDisplayName: string;
+  championDiscordId: string | null;
+  championAlias: string;
+}): Promise<void> {
+  const spinnerTag = p.spinnerDiscordId
+    ? `<@${p.spinnerDiscordId}>`
+    : `**${p.spinnerDisplayName}**`;
+  const championTag = p.championDiscordId
+    ? `<@${p.championDiscordId}>`
+    : `**${p.championDisplayName}**`;
+
+  const allowedUserIds = [p.championDiscordId, p.spinnerDiscordId].filter(
+    (id): id is string => !!id
+  );
+
+  await sendWebhook({
+    content: `🎡 ${spinnerTag} spun the Wheel of Henricus — and it points at ${championTag} (**${p.championAlias}**). Watch your step, the wheel hungers.`,
+    allowed_mentions: { parse: [], users: allowedUserIds },
+  });
+}
+
 export async function notifyHenricusSettled(p: {
   winners: { displayName: string; discordId: string | null }[];
   deadAlias: string;
@@ -580,8 +604,10 @@ export async function notifyHenricusSettled(p: {
     ? `<@${p.deadDiscordId}>`
     : `**${p.deadDisplay}**`;
 
-  const description =
-    p.winners.length === 1
+  const noWinners = p.winners.length === 0;
+  const description = noWinners
+    ? `💀 **${p.deadAlias}** has fallen at level ${p.deathLevel} to ${p.deathReason}. ${deadTag} was nobody's champion this round — and the Wheel of Henricus took its victim anyway. The house keeps the pot.`
+    : p.winners.length === 1
       ? `**${p.deadAlias}** fell at level ${p.deathLevel} to ${p.deathReason}. The wheel called it. ${winnerTags} read it right and the house pays out **${p.totalPayout.toLocaleString()} TC**. ${deadTag}, condolences — Henricus has your blessing on standby.`
       : `**${p.deadAlias}** fell at level ${p.deathLevel} to ${p.deathReason}. The wheel called it — and ${p.winners.length} spinners saw it coming. ${winnerTags} each collect **500 TC** from the house's purse. ${deadTag}, condolences — Henricus has your blessing on standby.`;
 
@@ -590,27 +616,41 @@ export async function notifyHenricusSettled(p: {
     ...(p.deadDiscordId ? [p.deadDiscordId] : []),
   ];
 
+  const fields: { name: string; value: string; inline: boolean }[] = [
+    { name: "💀 Fallen", value: `${p.deadAlias} (lvl ${p.deathLevel})`, inline: true },
+    { name: "🎯 Cause", value: p.deathReason || "Unknown", inline: true },
+    { name: "🎰 Spins this round", value: String(p.frameSpinCount), inline: true },
+  ];
+  if (noWinners) {
+    fields.push({
+      name: "🏠 Outcome",
+      value: "No champion — house keeps the pot",
+      inline: false,
+    });
+  } else {
+    fields.push(
+      {
+        name: p.winners.length === 1 ? "🏆 Winner" : `🏆 Winners (${p.winners.length})`,
+        value: p.winners.map((w) => w.displayName).join(", "),
+        inline: false,
+      },
+      {
+        name: "💰 House paid out",
+        value: `${p.totalPayout.toLocaleString()} TC`,
+        inline: true,
+      }
+    );
+  }
+
   await sendWebhook({
     content: description,
     embeds: [
       {
-        title: "💀 The Wheel of Henricus has spoken",
-        color: COLORS.green,
-        fields: [
-          { name: "💀 Fallen", value: `${p.deadAlias} (lvl ${p.deathLevel})`, inline: true },
-          { name: "🎯 Cause", value: p.deathReason || "Unknown", inline: true },
-          { name: "🎰 Spins this round", value: String(p.frameSpinCount), inline: true },
-          {
-            name: p.winners.length === 1 ? "🏆 Winner" : `🏆 Winners (${p.winners.length})`,
-            value: p.winners.map((w) => w.displayName).join(", "),
-            inline: false,
-          },
-          {
-            name: "💰 House paid out",
-            value: `${p.totalPayout.toLocaleString()} TC`,
-            inline: true,
-          },
-        ],
+        title: noWinners
+          ? "💀 The Wheel of Henricus claims a stray"
+          : "💀 The Wheel of Henricus has spoken",
+        color: noWinners ? COLORS.red : COLORS.green,
+        fields,
         footer: { text: "Wheel of Henricus" },
         timestamp: new Date().toISOString(),
       },

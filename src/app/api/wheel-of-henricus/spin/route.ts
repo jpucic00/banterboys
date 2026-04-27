@@ -10,6 +10,7 @@ import {
   getOrCreateActiveFrame,
   eligibleWheelUsers,
 } from "@/lib/wheel-of-henricus";
+import { notifyHenricusChampionSelected } from "@/lib/discord-notify";
 
 export const dynamic = "force-dynamic";
 
@@ -89,6 +90,7 @@ export async function POST() {
       return {
         spinId: spin.id,
         createdAt: spin.createdAt,
+        assignedUserId: assignee.id,
         assignedAlias: assignee.alias,
         assignedDisplayName: assignee.name ?? assignee.alias,
         newBalance: updatedUser.saldoTibiaCoins,
@@ -96,6 +98,41 @@ export async function POST() {
         frameId: frame.id,
       };
     });
+
+    // Fire-and-forget Discord notification — never blocks the response.
+    (async () => {
+      const [spinner, champion] = await Promise.all([
+        prisma.user.findUnique({
+          where: { id: userId },
+          select: {
+            name: true,
+            alias: true,
+            accounts: {
+              where: { provider: "discord" },
+              select: { providerAccountId: true },
+            },
+          },
+        }),
+        prisma.user.findUnique({
+          where: { id: result.assignedUserId },
+          select: {
+            name: true,
+            alias: true,
+            accounts: {
+              where: { provider: "discord" },
+              select: { providerAccountId: true },
+            },
+          },
+        }),
+      ]);
+      await notifyHenricusChampionSelected({
+        spinnerDisplayName: spinner?.alias ?? spinner?.name ?? "Unknown",
+        spinnerDiscordId: spinner?.accounts[0]?.providerAccountId ?? null,
+        championDisplayName: champion?.alias ?? champion?.name ?? result.assignedAlias,
+        championDiscordId: champion?.accounts[0]?.providerAccountId ?? null,
+        championAlias: result.assignedAlias,
+      });
+    })().catch(() => {});
 
     return NextResponse.json(result);
   } catch (err) {
