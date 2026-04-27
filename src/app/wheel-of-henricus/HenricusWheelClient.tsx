@@ -246,6 +246,48 @@ export default function HenricusWheelClient({
         </div>
       )}
 
+      {/* How it works */}
+      <section className="border border-border bg-[#0f0f0f] rounded-md p-5">
+        <h2 className="text-sm uppercase tracking-widest text-text-muted mb-4">
+          How it works
+        </h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+          <div>
+            <div className="text-[#F0A818] font-serif text-lg mb-1">
+              ① Spin the wheel
+            </div>
+            <p className="text-sm text-text-secondary leading-relaxed">
+              Pay{" "}
+              <span className="text-[#F0A818] font-mono">{SPIN_STAKE} TC</span>{" "}
+              per spin. The wheel picks a random Tibia character from the guild
+              and assigns it to you — that's your champion for the round.
+            </p>
+          </div>
+          <div>
+            <div className="text-[#F0A818] font-serif text-lg mb-1">
+              ② Wait for a death
+            </div>
+            <p className="text-sm text-text-secondary leading-relaxed">
+              The round stays open until <em>any</em> character on the wheel
+              dies in Tibia. That could be minutes or weeks. Once a death is
+              detected, the round settles automatically and a new one begins.
+            </p>
+          </div>
+          <div>
+            <div className="text-[#F0A818] font-serif text-lg mb-1">
+              ③ Win the bounty
+            </div>
+            <p className="text-sm text-text-secondary leading-relaxed">
+              If your assigned character is the one who falls, you win{" "}
+              <span className="text-odds-green font-mono">
+                {SPIN_PAYOUT} TC
+              </span>
+              . Multiple players can hold the same character — they all
+              collect.
+            </p>
+          </div>
+        </div>
+      </section>
 
       {/* Recent winners marquee */}
       {state.recentSettled.length > 0 && (
@@ -380,7 +422,7 @@ export default function HenricusWheelClient({
             </h1>
             <p className="text-[10px] text-text-muted leading-tight mt-1">
               {SPIN_STAKE} TC spin · win{" "}
-              <span className="text-[#F0A818]">{SPIN_PAYOUT} TC</span> if your alias falls
+              <span className="text-[#F0A818]">{SPIN_PAYOUT} TC</span> if your character falls
             </p>
           </div>
 
@@ -390,7 +432,7 @@ export default function HenricusWheelClient({
               {SPIN_STAKE} TC
             </div>
             <div className="text-[10px] text-text-muted mt-2 uppercase tracking-widest">
-              Win if your alias falls
+              Win if your character falls
             </div>
             <div className="text-2xl text-odds-green font-mono font-semibold mt-0.5 drop-shadow-[0_0_4px_#7ddc2c44]">
               {SPIN_PAYOUT} TC

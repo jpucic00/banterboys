@@ -85,7 +85,7 @@ export default async function HenricusFrameDetailPage({
         />
         {frame.status === "SETTLED" && (
           <>
-            <Stat label="Fallen alias" value={frame.deadAlias ?? "—"} accent />
+            <Stat label="Fallen character" value={frame.deadAlias ?? "—"} accent />
             <Stat
               label="Death level"
               value={frame.deathLevel ? String(frame.deathLevel) : "—"}
