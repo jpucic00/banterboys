@@ -586,15 +586,16 @@ function WheelSegment({
   const largeArc = endA - startA > 180 ? 1 : 0;
   const slicePath = `M 0 0 L ${x1} ${y1} A ${r} ${r} 0 ${largeArc} 1 ${x2} ${y2} Z`;
 
-  // Avatar at ~38% radius, label at ~72% radius (along segment midline).
-  const avatarR = 36;
-  const ax = q(avatarR * Math.cos(toRad(midA)));
-  const ay = q(avatarR * Math.sin(toRad(midA)));
-  const labelR = 70;
+  // Label at ~55% radius (middle band), avatar at ~80% radius (wide outer band).
+  const labelR = 55;
   const lx = q(labelR * Math.cos(toRad(midA)));
   const ly = q(labelR * Math.sin(toRad(midA)));
+  const avatarR = 80;
+  const ax = q(avatarR * Math.cos(toRad(midA)));
+  const ay = q(avatarR * Math.sin(toRad(midA)));
 
-  const display = alias.length > 18 ? alias.slice(0, 17) + "…" : alias;
+  const maxChars = Math.max(6, Math.floor(300 / total));
+  const display = alias.length > maxChars ? alias.slice(0, maxChars - 1) + "…" : alias;
   // Alternating wedge tones; if odd-count, force last wedge to a third tone
   // so segments 0 and N-1 don't share a fill at the seam.
   const seamConflict = total % 2 === 1 && index === total - 1;
@@ -625,50 +626,6 @@ function WheelSegment({
         strokeLinejoin="round"
       />
 
-      {image ? (
-        <>
-          <defs>
-            <clipPath id={clipId}>
-              <circle cx={ax} cy={ay} r={7.5} />
-            </clipPath>
-          </defs>
-          <image
-            href={image}
-            x={ax - 7.5}
-            y={ay - 7.5}
-            width={15}
-            height={15}
-            clipPath={`url(#${clipId})`}
-            preserveAspectRatio="xMidYMid slice"
-          />
-        </>
-      ) : (
-        <>
-          <circle cx={ax} cy={ay} r={7.5} fill="#1a140c" />
-          <text
-            x={ax}
-            y={ay}
-            textAnchor="middle"
-            dominantBaseline="central"
-            fontSize={9}
-            fontWeight={700}
-            fill="#F0A818"
-            fontFamily="sans-serif"
-          >
-            {firstChar}
-          </text>
-        </>
-      )}
-      <circle
-        cx={ax}
-        cy={ay}
-        r={7.5}
-        fill="none"
-        stroke="#F0A818"
-        strokeWidth={0.6}
-        strokeOpacity={0.7}
-      />
-
       <text
         x={lx}
         y={ly}
@@ -688,6 +645,50 @@ function WheelSegment({
       >
         {display}
       </text>
+
+      {image ? (
+        <>
+          <defs>
+            <clipPath id={clipId}>
+              <circle cx={ax} cy={ay} r={9} />
+            </clipPath>
+          </defs>
+          <image
+            href={image}
+            x={ax - 9}
+            y={ay - 9}
+            width={18}
+            height={18}
+            clipPath={`url(#${clipId})`}
+            preserveAspectRatio="xMidYMid slice"
+          />
+        </>
+      ) : (
+        <>
+          <circle cx={ax} cy={ay} r={9} fill="#1a140c" />
+          <text
+            x={ax}
+            y={ay}
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize={10}
+            fontWeight={700}
+            fill="#F0A818"
+            fontFamily="sans-serif"
+          >
+            {firstChar}
+          </text>
+        </>
+      )}
+      <circle
+        cx={ax}
+        cy={ay}
+        r={9}
+        fill="none"
+        stroke="#F0A818"
+        strokeWidth={0.6}
+        strokeOpacity={0.7}
+      />
     </g>
   );
 }
