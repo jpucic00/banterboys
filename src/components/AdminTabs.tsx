@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 
 const TABS = [
   { key: "overview", label: "Overview" },
-  { key: "trolian", label: "Trolian" },
+  { key: "balances", label: "Balances" },
 ] as const;
 
 export default function AdminTabs() {

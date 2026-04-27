@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
@@ -6,6 +7,8 @@ import { isAdminEmail } from "@/lib/admin";
 import AdminTabs from "@/components/AdminTabs";
 import { Section, StatGrid, Stat, CurrencyStat, fmtStat as fmt } from "@/components/StatCards";
 import { DISCORD_NOTIFY_MULTIPLIER } from "@/lib/slots";
+
+const HENRICUS_PAYOUT_PER_WIN = 500;
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +85,23 @@ type SlotStats = {
   gambleWinCount: number;
 };
 
+type HenricusSpinRow = {
+  stake: number;
+  payout: number;
+  isWinner: boolean;
+  assignedAlias: string;
+  frameId: string;
+  createdAt: Date;
+};
+
+type HenricusStats = {
+  houseProfit: number;
+  totalVolume: number;
+  totalPayouts: number;
+  spinCount: number;
+  winCount: number;
+};
+
 function calcTicketStats(tickets: TicketRow[]): TicketStats {
   const won = tickets.filter((t) => t.status === "WON");
   const lost = tickets.filter((t) => t.status === "LOST");
@@ -148,6 +168,19 @@ function calcSlotStats(spins: SlotRow[], gambles: GambleRow[]): SlotStats {
   };
 }
 
+function calcHenricusStats(spins: HenricusSpinRow[]): HenricusStats {
+  const totalVolume = spins.reduce((s, x) => s + x.stake, 0);
+  const totalPayouts = spins.reduce((s, x) => s + x.payout, 0);
+  const winCount = spins.filter((x) => x.isWinner).length;
+  return {
+    houseProfit: totalVolume - totalPayouts,
+    totalVolume,
+    totalPayouts,
+    spinCount: spins.length,
+    winCount,
+  };
+}
+
 function calcPvPStats(bets: PvPRow[]): PvPStats {
   const open = bets.filter((b) => b.status === "OPEN");
   const matched = bets.filter((b) => b.status === "MATCHED");
@@ -180,14 +213,13 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   }
 
   const { tab = "overview" } = await searchParams;
-  const isTrolian = tab === "trolian";
-  const trolianCutoff = new Date("2026-04-16T00:00:00+02:00");
+  const isBalances = tab === "balances";
 
   const now = new Date();
   const day7Ago = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const day30Ago = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
 
-  const [allTickets, allPvPBets, allSlotSpins, allGambleRounds, totalUsers, activeEvents] = await Promise.all([
+  const [tickets, pvpBets, slotSpins, gambleRounds, henricusSpins, henricusFrames, totalUsers, activeEvents] = await Promise.all([
     prisma.ticket.findMany({
       select: { status: true, amount: true, potentialPayout: true, totalOdds: true, currency: true, createdAt: true },
     }),
@@ -200,14 +232,15 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     prisma.slotGambleRound.findMany({
       select: { amount: true, won: true, createdAt: true },
     }),
+    prisma.henricusSpin.findMany({
+      select: { stake: true, payout: true, isWinner: true, assignedAlias: true, frameId: true, createdAt: true },
+    }),
+    prisma.henricusFrame.findMany({
+      select: { id: true, status: true, totalSpinCount: true, totalPayout: true, createdAt: true, settledAt: true },
+    }),
     prisma.user.count(),
     prisma.event.count({ where: { status: { in: ["UPCOMING", "LIVE"] } } }),
   ]);
-
-  const tickets = isTrolian ? allTickets.filter((t) => t.createdAt >= trolianCutoff) : allTickets;
-  const pvpBets = isTrolian ? allPvPBets.filter((b) => b.createdAt >= trolianCutoff) : allPvPBets;
-  const slotSpins = isTrolian ? allSlotSpins.filter((s) => s.createdAt >= trolianCutoff) : allSlotSpins;
-  const gambleRounds = isTrolian ? allGambleRounds.filter((g) => g.createdAt >= trolianCutoff) : allGambleRounds;
 
   const allTime = calcTicketStats(tickets);
   const last30d = calcTicketStats(tickets.filter((t) => t.createdAt >= day30Ago));
@@ -228,6 +261,45 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     gambleRounds.filter((g) => g.createdAt >= day7Ago)
   );
 
+  const henricusAll = calcHenricusStats(henricusSpins);
+  const henricus30d = calcHenricusStats(henricusSpins.filter((s) => s.createdAt >= day30Ago));
+  const henricus7d = calcHenricusStats(henricusSpins.filter((s) => s.createdAt >= day7Ago));
+
+  const settledHenricusFrames = henricusFrames.filter((f) => f.status === "SETTLED");
+  const settledHenricusFrameCount = settledHenricusFrames.length;
+  const activeHenricusFrame = henricusFrames.find((f) => f.status === "ACTIVE") ?? null;
+  const totalHenricusFrameCount = settledHenricusFrameCount + (activeHenricusFrame ? 1 : 0);
+  const avgHenricusSpinsPerRound = settledHenricusFrameCount > 0
+    ? settledHenricusFrames.reduce((s, f) => s + f.totalSpinCount, 0) / settledHenricusFrameCount
+    : 0;
+  const biggestHenricusRoundPayout = settledHenricusFrames.reduce(
+    (m, f) => Math.max(m, f.totalPayout),
+    0
+  );
+
+  const activeHenricusSpins = activeHenricusFrame
+    ? henricusSpins.filter((s) => s.frameId === activeHenricusFrame.id)
+    : [];
+  const activeHenricusVolume = activeHenricusSpins.reduce((s, x) => s + x.stake, 0);
+  const aliasSpinCounts = new Map<string, number>();
+  for (const s of activeHenricusSpins) {
+    aliasSpinCounts.set(s.assignedAlias, (aliasSpinCounts.get(s.assignedAlias) ?? 0) + 1);
+  }
+  let maxExposureAlias: string | null = null;
+  let maxExposureCount = 0;
+  for (const [alias, count] of aliasSpinCounts) {
+    if (count > maxExposureCount) {
+      maxExposureCount = count;
+      maxExposureAlias = alias;
+    }
+  }
+  const activeHenricusMaxExposure = maxExposureCount * HENRICUS_PAYOUT_PER_WIN;
+  const activeHenricusDaysRunning = activeHenricusFrame
+    ? Math.floor(
+        (now.getTime() - activeHenricusFrame.createdAt.getTime()) / (24 * 60 * 60 * 1000)
+      )
+    : 0;
+
   return (
     <div className="space-y-8">
       <div className="flex items-center justify-between">
@@ -236,11 +308,16 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           <AdminTabs />
         </div>
         <span className="text-xs text-text-muted">
-          {isTrolian && <span className="text-gold mr-2">Since Apr 16</span>}
           {now.toLocaleString("en-GB", { dateStyle: "medium", timeStyle: "short" })}
         </span>
       </div>
 
+      {isBalances ? (
+        <Section title="Player Balances">
+          <SaldoManager />
+        </Section>
+      ) : (
+        <>
       {/* Overview */}
       <Section title="Overview">
         <StatGrid>
@@ -298,11 +375,6 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
             sub="total collected from lost tickets"
           />
         </StatGrid>
-      </Section>
-
-      {/* Player Saldos */}
-      <Section title="Player Balances">
-        <SaldoManager />
       </Section>
 
       {/* Ticket counts */}
@@ -483,6 +555,134 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
           )}
         </div>
       </Section>
+
+      {/* Wheel of Henricus */}
+      <Section title="Wheel of Henricus (Tibia Coins)">
+        <div className="space-y-4">
+          {/* Core financials */}
+          <StatGrid cols={4}>
+            <Stat
+              label="House Profit"
+              value={`${henricusAll.houseProfit >= 0 ? "+" : ""}${fmt(henricusAll.houseProfit)} TC`}
+              color={henricusAll.houseProfit >= 0 ? "text-win" : "text-loss"}
+              sub={`${fmt(henricusAll.totalPayouts)} TC paid out`}
+            />
+            <Stat
+              label="Total Volume"
+              value={`${fmt(henricusAll.totalVolume)} TC`}
+              color="text-text-primary"
+              sub="total wagered"
+            />
+            <Stat
+              label="Spins"
+              value={String(henricusAll.spinCount)}
+              color="text-text-primary"
+              sub={`${henricusAll.winCount} winning`}
+            />
+            <Stat
+              label="Rounds"
+              value={String(totalHenricusFrameCount)}
+              color="text-text-primary"
+              sub={`${settledHenricusFrameCount} settled · ${activeHenricusFrame ? 1 : 0} active`}
+            />
+          </StatGrid>
+
+          {/* Round stats */}
+          <StatGrid cols={4}>
+            <Stat
+              label="Avg Spins/Round"
+              value={avgHenricusSpinsPerRound > 0 ? avgHenricusSpinsPerRound.toFixed(1) : "—"}
+              color="text-text-primary"
+              sub="across settled rounds"
+            />
+            <Stat
+              label="Biggest Round Payout"
+              value={biggestHenricusRoundPayout > 0 ? `${fmt(biggestHenricusRoundPayout)} TC` : "—"}
+              color={biggestHenricusRoundPayout > 0 ? "text-gold" : "text-text-muted"}
+              sub="single round"
+            />
+            <Stat
+              label="Active Round Spins"
+              value={activeHenricusFrame ? String(activeHenricusSpins.length) : "—"}
+              color={activeHenricusFrame ? "text-gold" : "text-text-muted"}
+              sub={
+                activeHenricusFrame
+                  ? `${fmt(activeHenricusVolume)} TC · ${activeHenricusDaysRunning}d running`
+                  : "no active round"
+              }
+            />
+            <Stat
+              label="Max Exposure"
+              value={
+                activeHenricusFrame && maxExposureCount > 0
+                  ? `${fmt(activeHenricusMaxExposure)} TC`
+                  : "—"
+              }
+              color={
+                activeHenricusFrame && maxExposureCount > 0 ? "text-loss" : "text-text-muted"
+              }
+              sub={
+                activeHenricusFrame && maxExposureAlias
+                  ? `if ${maxExposureAlias} dies (${maxExposureCount} spins)`
+                  : "active round worst case"
+              }
+            />
+          </StatGrid>
+
+          {/* Period comparison */}
+          {henricusAll.spinCount > 0 && (
+            <div className="overflow-x-auto pt-2">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-text-muted text-xs uppercase tracking-wide border-b border-border">
+                    <th className="text-left pb-2 pr-4">Period</th>
+                    <th className="text-right pb-2 px-4">Profit</th>
+                    <th className="text-right pb-2 px-4">Volume</th>
+                    <th className="text-right pb-2 px-4">Spins</th>
+                    <th className="text-right pb-2 px-4">Winners</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {(
+                    [
+                      { label: "All-time", s: henricusAll },
+                      { label: "Last 30d", s: henricus30d },
+                      { label: "Last 7d", s: henricus7d },
+                    ] as const
+                  ).map(({ label, s }) => (
+                    <tr key={label}>
+                      <td className="text-text-secondary py-3 pr-4 font-medium">{label}</td>
+                      <td className={`text-right px-4 font-mono font-semibold ${s.houseProfit >= 0 ? "text-win" : "text-loss"}`}>
+                        {s.houseProfit >= 0 ? "+" : ""}{fmt(s.houseProfit)} TC
+                      </td>
+                      <td className="text-right px-4 text-text-secondary font-mono">
+                        {fmt(s.totalVolume)} TC
+                      </td>
+                      <td className="text-right px-4 text-text-muted">{s.spinCount}</td>
+                      <td className="text-right px-4 text-odds-green">{s.winCount}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+
+          {henricusAll.spinCount === 0 && (
+            <p className="text-text-muted text-sm text-center py-4">No spins yet.</p>
+          )}
+
+          <div className="flex justify-end pt-1">
+            <Link
+              href="/wheel-of-henricus/history"
+              className="text-xs text-[#F0A818] hover:underline"
+            >
+              Full audit trail →
+            </Link>
+          </div>
+        </div>
+      </Section>
+        </>
+      )}
     </div>
   );
 }
