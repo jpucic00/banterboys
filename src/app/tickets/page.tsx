@@ -6,7 +6,12 @@ import { createPortal } from "react-dom";
 import { CoinAmount } from "@/components/CoinIcon";
 import Image from "next/image";
 import { Currency } from "@prisma/client";
-import { exceedsProfitCap, MAX_TICKET_STAKE } from "@/lib/bet-limits";
+import {
+  exceedsProfitCap,
+  formatCurrencyAmount,
+  MAX_TICKET_PROFIT,
+  MAX_TICKET_STAKE,
+} from "@/lib/bet-limits";
 
 interface Event {
   id: string;
@@ -438,6 +443,11 @@ export default function TicketsPage() {
     totalOdds,
     currency as Currency
   );
+  const profitCap = MAX_TICKET_PROFIT[currency as Currency];
+  const profitCapLabel =
+    profitCap !== undefined
+      ? formatCurrencyAmount(profitCap, currency as Currency)
+      : null;
   const maxStake = MAX_TICKET_STAKE[currency as Currency];
 
   async function handleSubmit() {
@@ -827,7 +837,7 @@ export default function TicketsPage() {
 
                   {profitCapExceeded && (
                     <p className="text-xs text-loss border border-loss/30 rounded p-2 leading-relaxed" style={{ background: "#1a0000" }}>
-                      Profit over 50kk is not allowed. Lower your stake or drop a selection.
+                      Profit over {profitCapLabel} is not allowed. Lower your stake or drop a selection.
                     </p>
                   )}
 
@@ -1005,7 +1015,7 @@ export default function TicketsPage() {
 
                   {profitCapExceeded && (
                     <p className="text-xs text-loss border border-loss/30 rounded p-2 leading-relaxed" style={{ background: "#1a0000" }}>
-                      Profit over 50kk is not allowed. Lower your stake or drop a selection.
+                      Profit over {profitCapLabel} is not allowed. Lower your stake or drop a selection.
                     </p>
                   )}
 

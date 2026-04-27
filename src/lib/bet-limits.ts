@@ -18,10 +18,10 @@ export const MIN_TICKET_STAKE: Record<Currency, number> = {
   TIBIA_COINS: 1,
 };
 
-// Cap on profit (payout − stake). Applied to GOLD only; the 500 TC stake cap
-// already keeps TC payouts bounded without a separate profit cap.
+// Cap on profit (payout − stake), per currency.
 export const MAX_TICKET_PROFIT: Partial<Record<Currency, number>> = {
   GOLD: 50_000_000,
+  TIBIA_COINS: 1_350,
 };
 
 // Hard cap on how far a player may go into debt. Placing a slip that would
