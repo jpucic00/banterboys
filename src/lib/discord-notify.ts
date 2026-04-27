@@ -563,6 +563,62 @@ export async function notifyTicketSettled(
   });
 }
 
+export async function notifyHenricusSettled(p: {
+  winners: { displayName: string; discordId: string | null }[];
+  deadAlias: string;
+  deadDisplay: string;
+  deadDiscordId: string | null;
+  deathLevel: number;
+  deathReason: string;
+  totalPayout: number;
+  frameSpinCount: number;
+}): Promise<void> {
+  const winnerTags = p.winners
+    .map((w) => (w.discordId ? `<@${w.discordId}>` : `**${w.displayName}**`))
+    .join(", ");
+  const deadTag = p.deadDiscordId
+    ? `<@${p.deadDiscordId}>`
+    : `**${p.deadDisplay}**`;
+
+  const description =
+    p.winners.length === 1
+      ? `**${p.deadAlias}** fell at level ${p.deathLevel} to ${p.deathReason}. The wheel called it. ${winnerTags} read it right and the house pays out **${p.totalPayout.toLocaleString()} TC**. ${deadTag}, condolences — Henricus has your blessing on standby.`
+      : `**${p.deadAlias}** fell at level ${p.deathLevel} to ${p.deathReason}. The wheel called it — and ${p.winners.length} spinners saw it coming. ${winnerTags} each collect **500 TC** from the house's purse. ${deadTag}, condolences — Henricus has your blessing on standby.`;
+
+  const allowedUserIds = [
+    ...p.winners.map((w) => w.discordId).filter((id): id is string => !!id),
+    ...(p.deadDiscordId ? [p.deadDiscordId] : []),
+  ];
+
+  await sendWebhook({
+    content: description,
+    embeds: [
+      {
+        title: "💀 The Wheel of Henricus has spoken",
+        color: COLORS.green,
+        fields: [
+          { name: "💀 Fallen", value: `${p.deadAlias} (lvl ${p.deathLevel})`, inline: true },
+          { name: "🎯 Cause", value: p.deathReason || "Unknown", inline: true },
+          { name: "🎰 Spins this round", value: String(p.frameSpinCount), inline: true },
+          {
+            name: p.winners.length === 1 ? "🏆 Winner" : `🏆 Winners (${p.winners.length})`,
+            value: p.winners.map((w) => w.displayName).join(", "),
+            inline: false,
+          },
+          {
+            name: "💰 House paid out",
+            value: `${p.totalPayout.toLocaleString()} TC`,
+            inline: true,
+          },
+        ],
+        footer: { text: "Wheel of Henricus" },
+        timestamp: new Date().toISOString(),
+      },
+    ],
+    allowed_mentions: { parse: [], users: allowedUserIds },
+  });
+}
+
 const SLOT_SYMBOL_LABELS: Record<string, string> = {
   snake: "Snake",
   dragon_lord: "Dragon Lord",

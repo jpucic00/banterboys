@@ -1,11 +1,23 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { EventStatus, TicketStatus } from "@prisma/client";
+import { Currency, EventStatus, TicketStatus } from "@prisma/client";
 import { notifyTicketCreated, notifyTicketCancelled } from "@/lib/discord-notify";
 import { adjustSaldo } from "@/lib/saldo";
 import { isAdminEmail } from "@/lib/admin";
 import { isBettingDisabled, bettingDisabledResponse } from "@/lib/betting-status";
+import {
+  slipSignature,
+  validateTicketPlacement,
+} from "@/lib/bet-limits";
+
+class TicketValidationError extends Error {
+  status: number;
+  constructor(message: string, status = 400) {
+    super(message);
+    this.status = status;
+  }
+}
 
 export async function GET() {
   const session = await auth();
@@ -47,6 +59,10 @@ export async function POST(req: NextRequest) {
   ) {
     return NextResponse.json({ error: "Missing fields" }, { status: 400 });
   }
+
+  const parsedAmount = parseFloat(amount);
+  const resolvedCurrency: Currency =
+    currency === "TIBIA_COINS" ? Currency.TIBIA_COINS : Currency.GOLD;
 
   // Validate all events are upcoming and get current odds
   const validSelections: {
@@ -95,33 +111,86 @@ export async function POST(req: NextRequest) {
   }
 
   const totalOdds = validSelections.reduce((acc, s) => acc * s.odds, 1);
-  const potentialPayout = parseFloat(amount) * totalOdds;
+  const newSignature = slipSignature(validSelections);
 
-  const ticket = await prisma.ticket.create({
-    data: {
-      userId: session.user.id,
-      totalOdds: Math.round(totalOdds * 100) / 100,
-      amount: parseFloat(amount),
-      currency: currency || "GOLD",
-      potentialPayout: Math.round(potentialPayout * 100) / 100,
-      selections: {
-        create: validSelections.map((s) => ({
-          eventId: s.eventId,
-          pick: s.pick as "HOME" | "AWAY" | "DRAW" | "HOME_DRAW" | "AWAY_DRAW",
-          odds: s.odds,
-        })),
-      },
-    },
-    include: {
-      selections: {
-        include: { event: { include: { sport: true } } },
-      },
-    },
-  });
+  try {
+    const ticket = await prisma.$transaction(async (tx) => {
+      const user = await tx.user.findUnique({
+        where: { id: session.user.id },
+        select: { saldoGold: true, saldoTibiaCoins: true },
+      });
+      if (!user) throw new TicketValidationError("User not found", 404);
 
-  await adjustSaldo(session.user.id, currency || "GOLD", -parseFloat(amount));
-  notifyTicketCreated(ticket, session.user).catch(() => {});
-  return NextResponse.json(ticket, { status: 201 });
+      const currentBalance =
+        resolvedCurrency === Currency.GOLD
+          ? user.saldoGold
+          : user.saldoTibiaCoins;
+
+      const check = validateTicketPlacement({
+        amount: parsedAmount,
+        currency: resolvedCurrency,
+        totalOdds,
+        currentBalance,
+      });
+      if (!check.ok) throw new TicketValidationError(check.message);
+      const potentialPayout = check.potentialPayout;
+
+      // Duplicate detection: reject if the user already holds an active
+      // (PENDING) slip with the exact same set of (event, pick) pairs.
+      const existingPending = await tx.ticket.findMany({
+        where: { userId: session.user.id, status: TicketStatus.PENDING },
+        select: { selections: { select: { eventId: true, pick: true } } },
+      });
+      const duplicate = existingPending.some(
+        (t) => slipSignature(t.selections) === newSignature
+      );
+      if (duplicate) {
+        throw new TicketValidationError(
+          "You already have an active bet slip with these exact picks."
+        );
+      }
+
+      const created = await tx.ticket.create({
+        data: {
+          userId: session.user.id,
+          totalOdds: Math.round(totalOdds * 100) / 100,
+          amount: parsedAmount,
+          currency: resolvedCurrency,
+          potentialPayout: Math.round(potentialPayout * 100) / 100,
+          selections: {
+            create: validSelections.map((s) => ({
+              eventId: s.eventId,
+              pick: s.pick as "HOME" | "AWAY" | "DRAW" | "HOME_DRAW" | "AWAY_DRAW",
+              odds: s.odds,
+            })),
+          },
+        },
+        include: {
+          selections: {
+            include: { event: { include: { sport: true } } },
+          },
+        },
+      });
+
+      const field =
+        resolvedCurrency === Currency.GOLD ? "saldoGold" : "saldoTibiaCoins";
+      await tx.user.update({
+        where: { id: session.user.id },
+        data: { [field]: { decrement: parsedAmount } },
+      });
+
+      return created;
+    });
+
+    notifyTicketCreated(ticket, session.user).catch(() => {});
+    return NextResponse.json(ticket, { status: 201 });
+  } catch (err) {
+    if (err instanceof TicketValidationError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    console.error("[tickets]", err);
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
+  }
 }
 
 export async function PATCH(req: NextRequest) {

@@ -20,11 +20,13 @@ export async function register() {
     const scoresSchedule = process.env.CRON_SCORES_SCHEDULE ?? "*/5 * * * *";
     const oddsSchedule = process.env.CRON_ODDS_SCHEDULE ?? "0 0 * * *";
     const cleanupSchedule = process.env.CRON_CLEANUP_SCHEDULE ?? "0 0 * * 0";
+    const henricusSchedule = process.env.CRON_HENRICUS_SCHEDULE ?? "* * * * *";
     cron.default.schedule(liveScoresSchedule, () => run("/api/cron/fetch-scores"));
     cron.default.schedule(scoresSchedule, () => run("/api/cron/fetch-scores?sweep=1"));
     cron.default.schedule(oddsSchedule, () => run("/api/cron/fetch-odds"));
     cron.default.schedule(cleanupSchedule, () => run("/api/cron/cleanup-unmapped"));
+    cron.default.schedule(henricusSchedule, () => run("/api/cron/wheel-of-henricus-deaths"));
 
-    console.log(`[cron] Scheduled: fetch-scores live (${liveScoresSchedule}), fetch-scores sweep (${scoresSchedule}), fetch-odds (${oddsSchedule}), cleanup-unmapped (${cleanupSchedule})`);
+    console.log(`[cron] Scheduled: fetch-scores live (${liveScoresSchedule}), fetch-scores sweep (${scoresSchedule}), fetch-odds (${oddsSchedule}), cleanup-unmapped (${cleanupSchedule}), wheel-of-henricus-deaths (${henricusSchedule})`);
   }
 }

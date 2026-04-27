@@ -5,6 +5,8 @@ import { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import { CoinAmount } from "@/components/CoinIcon";
 import Image from "next/image";
+import { Currency } from "@prisma/client";
+import { exceedsProfitCap, MAX_TICKET_STAKE } from "@/lib/bet-limits";
 
 interface Event {
   id: string;
@@ -336,6 +338,7 @@ export default function TicketsPage() {
   const [selectedLeague, setSelectedLeague] = useState<string>("all");
 
   const [removedNotice, setRemovedNotice] = useState<string | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const canInteract = !!session;
 
   // Load slip from localStorage on mount
@@ -428,10 +431,18 @@ export default function TicketsPage() {
   }
 
   const totalOdds = slip.reduce((acc, s) => acc * s.odds, 1);
-  const potentialPayout = parseFloat(amount || "0") * totalOdds;
+  const stakeNum = parseFloat(amount || "0");
+  const potentialPayout = stakeNum * totalOdds;
+  const profitCapExceeded = exceedsProfitCap(
+    stakeNum,
+    totalOdds,
+    currency as Currency
+  );
+  const maxStake = MAX_TICKET_STAKE[currency as Currency];
 
   async function handleSubmit() {
     if (slip.length === 0 || !amount) return;
+    setSubmitError(null);
 
     // Filter out expired events (events no longer in the UPCOMING list)
     const activeEventIds = new Set(events.map((e) => e.id));
@@ -467,7 +478,12 @@ export default function TicketsPage() {
         localStorage.removeItem("betSlipCurrency");
         loadTickets();
         setTab("mine");
+      } else {
+        const data = await res.json().catch(() => ({ error: "Failed to place bet." }));
+        setSubmitError(data.error ?? "Failed to place bet.");
       }
+    } catch {
+      setSubmitError("Network error — please try again.");
     } finally {
       setSubmitting(false);
     }
@@ -783,6 +799,7 @@ export default function TicketsPage() {
                       onChange={(e) => setAmount(e.target.value)}
                       placeholder="Stake"
                       min="1"
+                      max={maxStake}
                       className="flex-1 bg-surface border border-border rounded px-3 py-1.5 text-text-primary text-sm focus:outline-none focus:border-gold"
                     />
                     <select
@@ -802,22 +819,28 @@ export default function TicketsPage() {
                     </div>
                     <div className="flex justify-between font-medium">
                       <span className="text-text-secondary">Potential Payout</span>
-                      <span className="text-gold">
+                      <span className={profitCapExceeded ? "text-loss" : "text-gold"}>
                         <CoinAmount amount={Math.round(potentialPayout)} currency={currency} />
                       </span>
                     </div>
                   </div>
 
-                  {potentialPayout > 100_000_000 && (
-                    <p className="text-xs text-yellow-400 border border-yellow-400/30 rounded p-2 leading-relaxed">
-                      Bets with a payout above 100kk require admin approval via Discord before they are confirmed.
+                  {profitCapExceeded && (
+                    <p className="text-xs text-loss border border-loss/30 rounded p-2 leading-relaxed" style={{ background: "#1a0000" }}>
+                      Profit over 50kk is not allowed. Lower your stake or drop a selection.
+                    </p>
+                  )}
+
+                  {submitError && (
+                    <p className="text-xs text-loss border border-loss/30 rounded p-2 leading-relaxed" style={{ background: "#1a0000" }}>
+                      {submitError}
                     </p>
                   )}
 
                   {canInteract ? (
                     <button
                       onClick={handleSubmit}
-                      disabled={submitting || !amount}
+                      disabled={submitting || !amount || profitCapExceeded}
                       className="w-full bg-gold hover:bg-gold-bright text-black py-2 rounded text-sm font-bold uppercase tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {submitting ? "Placing..." : "Place Bet"}
@@ -954,6 +977,7 @@ export default function TicketsPage() {
                       onChange={(e) => setAmount(e.target.value)}
                       placeholder="Stake"
                       min="1"
+                      max={maxStake}
                       className="flex-1 bg-surface border border-border rounded px-3 py-1.5 text-text-primary text-sm focus:outline-none focus:border-gold"
                     />
                     <select
@@ -973,22 +997,28 @@ export default function TicketsPage() {
                     </div>
                     <div className="flex justify-between font-medium">
                       <span className="text-text-secondary">Potential Payout</span>
-                      <span className="text-gold">
+                      <span className={profitCapExceeded ? "text-loss" : "text-gold"}>
                         <CoinAmount amount={Math.round(potentialPayout)} currency={currency} />
                       </span>
                     </div>
                   </div>
 
-                  {potentialPayout > 100_000_000 && (
-                    <p className="text-xs text-yellow-400 border border-yellow-400/30 rounded p-2 leading-relaxed">
-                      Bets with a payout above 100kk require admin approval via Discord before they are confirmed.
+                  {profitCapExceeded && (
+                    <p className="text-xs text-loss border border-loss/30 rounded p-2 leading-relaxed" style={{ background: "#1a0000" }}>
+                      Profit over 50kk is not allowed. Lower your stake or drop a selection.
+                    </p>
+                  )}
+
+                  {submitError && (
+                    <p className="text-xs text-loss border border-loss/30 rounded p-2 leading-relaxed" style={{ background: "#1a0000" }}>
+                      {submitError}
                     </p>
                   )}
 
                   {canInteract ? (
                     <button
                       onClick={handleSubmit}
-                      disabled={submitting || !amount}
+                      disabled={submitting || !amount || profitCapExceeded}
                       className="w-full bg-gold hover:bg-gold-bright text-black py-2 rounded text-sm font-bold uppercase tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {submitting ? "Placing..." : "Place Bet"}

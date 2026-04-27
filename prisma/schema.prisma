@@ -55,6 +55,11 @@ enum SelectionResult {
   VOID
 }
 
+enum HenricusFrameStatus {
+  ACTIVE
+  SETTLED
+}
+
 // NextAuth required models
 model Account {
   id                String  @id @default(cuid())
@@ -113,13 +118,15 @@ model User {
   activeFreeSpins Int   @default(0)
   freeSpinStake   Float @default(0)
 
-  accounts      Account[]
-  sessions      Session[]
-  createdBets   PvPBet[]          @relation("BetCreator")
-  acceptedBets  PvPBet[]          @relation("BetAcceptor")
-  tickets       Ticket[]
-  slotSpins     SlotSpin[]
-  gambleRounds  SlotGambleRound[]
+  accounts                 Account[]
+  sessions                 Session[]
+  createdBets              PvPBet[]          @relation("BetCreator")
+  acceptedBets             PvPBet[]          @relation("BetAcceptor")
+  tickets                  Ticket[]
+  slotSpins                SlotSpin[]
+  gambleRounds             SlotGambleRound[]
+  henricusSpinsAsSpinner   HenricusSpin[]    @relation("HenricusSpinner")
+  henricusSpinsAsAssigned  HenricusSpin[]    @relation("HenricusAssigned")
 }
 
 model Sport {
@@ -265,5 +272,53 @@ model SlotGambleRound {
   spin SlotSpin? @relation(fields: [spinId], references: [id])
 
   @@index([userId])
+  @@index([createdAt])
+}
+
+// Wheel of Henricus — fixed-odds lottery game where each spin (25 TC) picks a
+// random guildmate (excluding self). When any in-frame assigned alias dies in
+// real life (TibiaData polled every minute), every matching spin pays a flat
+// 500 TC from the house. Multiple winners each get the full 500.
+model HenricusFrame {
+  id              String              @id @default(cuid())
+  status          HenricusFrameStatus @default(ACTIVE)
+  totalSpinCount  Int                 @default(0)
+  totalPayout     Float               @default(0)
+  deadAlias       String?
+  deadAtServer    DateTime?
+  deadAtTibia     DateTime?
+  deathLevel      Int?
+  deathReason     String?
+  createdAt       DateTime            @default(now())
+  settledAt       DateTime?
+
+  spins HenricusSpin[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model HenricusSpin {
+  id             String   @id @default(cuid())
+  frameId        String
+  spinnerUserId  String
+  assignedUserId String
+  // Snapshot of the assigned user's alias at spin time so death-tracking
+  // is stable even if the user later renames their character.
+  assignedAlias  String
+  stake          Float    @default(25)
+  payout         Float    @default(0)
+  isWinner       Boolean  @default(false)
+  currency       Currency @default(TIBIA_COINS)
+  createdAt      DateTime @default(now())
+
+  frame    HenricusFrame @relation(fields: [frameId], references: [id])
+  spinner  User          @relation("HenricusSpinner", fields: [spinnerUserId], references: [id])
+  assigned User          @relation("HenricusAssigned", fields: [assignedUserId], references: [id])
+
+  @@index([frameId])
+  @@index([frameId, spinnerUserId])
+  @@index([assignedAlias])
+  @@index([spinnerUserId])
   @@index([createdAt])
 }

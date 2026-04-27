@@ -195,7 +195,7 @@ export function resolveSpin(
 // Stake bounds — single source of truth for validation + UI.
 // GOLD is disabled at launch (see API route); limits kept here for easy v1.1 unlock.
 export const STAKE_LIMITS = {
-  TIBIA_COINS: { min: 1, max: 25, presets: [1, 5, 10, 25] },
+  TIBIA_COINS: { min: 1, max: 10, presets: [1, 2, 5, 10] },
   GOLD: { min: 100, max: 1_000_000, presets: [100, 1_000, 10_000, 100_000] },
 } as const;
 

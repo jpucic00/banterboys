@@ -41,6 +41,12 @@ export default function Navbar() {
           <NavLink href="/bets" active={pathname === "/bets"}>PvP Bets</NavLink>
           <NavLink href="/tickets" active={pathname === "/tickets"}>Bet Slips</NavLink>
           <NavLink href="/slots" active={pathname === "/slots"}>Slots</NavLink>
+          <NavLink
+            href="/wheel-of-henricus"
+            active={pathname.startsWith("/wheel-of-henricus")}
+          >
+            Wheel of Henricus
+          </NavLink>
           {session && (
             <NavLink href="/profile" active={pathname === "/profile"}>My Profile</NavLink>
           )}
@@ -120,6 +126,13 @@ export default function Navbar() {
               <MobileLink href="/bets" active={pathname === "/bets"} onClick={() => setMenuOpen(false)}>PvP Bets</MobileLink>
               <MobileLink href="/tickets" active={pathname === "/tickets"} onClick={() => setMenuOpen(false)}>Bet Slips</MobileLink>
               <MobileLink href="/slots" active={pathname === "/slots"} onClick={() => setMenuOpen(false)}>Slots</MobileLink>
+              <MobileLink
+                href="/wheel-of-henricus"
+                active={pathname.startsWith("/wheel-of-henricus")}
+                onClick={() => setMenuOpen(false)}
+              >
+                Wheel of Henricus
+              </MobileLink>
               {session && (
                 <MobileLink href="/profile" active={pathname === "/profile"} onClick={() => setMenuOpen(false)}>My Profile</MobileLink>
               )}
