@@ -1,7 +1,94 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
-import { fetchOddsForSport, SPORT_KEYS } from "@/lib/odds-api";
+import { fetchEvents, fetchOddsForSport, SPORT_KEYS } from "@/lib/odds-api";
 import { ESPN_SPORT_MAP, fetchEspnEventsByDate, findEspnMatch } from "@/lib/espn-api";
+
+const TEAM_DATE_MATCH_WINDOW_MS = 48 * 60 * 60 * 1000;
+
+/**
+ * Match an incoming Odds API event to an existing DB row by apiEventId, then
+ * fall back to teams + commenceTime within ±48h. The fallback handles cases
+ * where The Odds API issues a fresh apiEventId after a reschedule — without it
+ * the stale row would never be touched and a duplicate would accumulate.
+ *
+ * When the fallback finds a row whose apiEventId differs from the incoming one,
+ * a duplicate may already exist in the same run (the /odds pass created it
+ * before this /events pass discovered the orphan). Migrate FK references off
+ * the duplicate and delete it inside the same transaction so the @unique
+ * apiEventId constraint stays satisfied.
+ */
+async function matchOrCreateEvent(
+  sportId: string,
+  apiEvent: { id: string; home_team: string; away_team: string; commence_time: string },
+) {
+  const commenceTime = new Date(apiEvent.commence_time);
+
+  const existingById = await prisma.event.findUnique({
+    where: { apiEventId: apiEvent.id },
+  });
+  if (existingById) {
+    return prisma.event.update({
+      where: { id: existingById.id },
+      data: {
+        homeTeam: apiEvent.home_team,
+        awayTeam: apiEvent.away_team,
+        commenceTime,
+      },
+    });
+  }
+
+  const windowStart = new Date(commenceTime.getTime() - TEAM_DATE_MATCH_WINDOW_MS);
+  const windowEnd = new Date(commenceTime.getTime() + TEAM_DATE_MATCH_WINDOW_MS);
+  const orphan = await prisma.event.findFirst({
+    where: {
+      sportId,
+      status: "UPCOMING",
+      homeTeam: { equals: apiEvent.home_team, mode: "insensitive" },
+      awayTeam: { equals: apiEvent.away_team, mode: "insensitive" },
+      commenceTime: { gte: windowStart, lte: windowEnd },
+    },
+  });
+
+  if (orphan) {
+    return prisma.$transaction(async (tx) => {
+      const dup = await tx.event.findUnique({ where: { apiEventId: apiEvent.id } });
+      if (dup && dup.id !== orphan.id) {
+        await tx.oddsSnapshot.updateMany({
+          where: { eventId: dup.id },
+          data: { eventId: orphan.id },
+        });
+        await tx.pvPBet.updateMany({
+          where: { eventId: dup.id },
+          data: { eventId: orphan.id },
+        });
+        await tx.ticketSelection.updateMany({
+          where: { eventId: dup.id },
+          data: { eventId: orphan.id },
+        });
+        await tx.event.delete({ where: { id: dup.id } });
+      }
+      return tx.event.update({
+        where: { id: orphan.id },
+        data: {
+          apiEventId: apiEvent.id,
+          homeTeam: apiEvent.home_team,
+          awayTeam: apiEvent.away_team,
+          commenceTime,
+        },
+      });
+    });
+  }
+
+  return prisma.event.create({
+    data: {
+      apiEventId: apiEvent.id,
+      sportId,
+      homeTeam: apiEvent.home_team,
+      awayTeam: apiEvent.away_team,
+      commenceTime,
+    },
+  });
+}
 
 export async function GET(req: NextRequest) {
   const secret = req.nextUrl.searchParams.get("secret");
@@ -23,21 +110,7 @@ export async function GET(req: NextRequest) {
       let count = 0;
 
       for (const apiEvent of events) {
-        const event = await prisma.event.upsert({
-          where: { apiEventId: apiEvent.id },
-          update: {
-            homeTeam: apiEvent.home_team,
-            awayTeam: apiEvent.away_team,
-            commenceTime: new Date(apiEvent.commence_time),
-          },
-          create: {
-            apiEventId: apiEvent.id,
-            sportId: sport.id,
-            homeTeam: apiEvent.home_team,
-            awayTeam: apiEvent.away_team,
-            commenceTime: new Date(apiEvent.commence_time),
-          },
-        });
+        const event = await matchOrCreateEvent(sport.id, apiEvent);
 
         // Prefer a bookmaker whose h2h market carries a 3-way outcome (Home/Draw/Away).
         // Soccer h2h is already 3-way everywhere. NHL h2h is 2-way for most bookmakers but
@@ -84,6 +157,24 @@ export async function GET(req: NextRequest) {
       }
 
       results[sportKey] = count;
+
+      // ── Refresh commenceTime for events without bookmakers ────────────
+      // The /odds endpoint excludes events with no usable bookmakers, so a
+      // game whose odds were temporarily pulled (or whose Odds API id changed
+      // after a reschedule) is invisible to the loop above. /events returns
+      // every upcoming event regardless, letting matchOrCreateEvent reconcile
+      // stale rows by team + date.
+      try {
+        const allEvents = await fetchEvents(sportKey);
+        let refreshed = 0;
+        for (const apiEvent of allEvents) {
+          await matchOrCreateEvent(sport.id, apiEvent);
+          refreshed++;
+        }
+        if (refreshed > 0) results[`${sportKey}_events_refreshed`] = refreshed;
+      } catch (error) {
+        console.error(`[fetch-odds] /events pass failed for ${sportKey}:`, error);
+      }
 
       // ── ESPN ID mapping ────────────────────────────────────────────────
       if (sportKey in ESPN_SPORT_MAP) {
