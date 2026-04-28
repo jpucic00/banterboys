@@ -1,15 +1,23 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { redirect } from "next/navigation";
+import { isAdminEmail } from "@/lib/admin";
+import { redirect, notFound } from "next/navigation";
+import Link from "next/link";
 import ProfileStatsView from "@/components/ProfileStatsView";
 
 export const dynamic = "force-dynamic";
 
-export default async function ProfilePage() {
+export default async function AdminUserProfilePage({
+  params,
+}: {
+  params: Promise<{ userId: string }>;
+}) {
   const session = await auth();
-  if (!session?.user?.id) redirect("/");
+  if (!isAdminEmail(session?.user?.email)) {
+    redirect("/");
+  }
 
-  const userId = session.user.id;
+  const { userId } = await params;
 
   const [user, tickets, pvpBets] = await Promise.all([
     prisma.user.findUnique({
@@ -44,16 +52,24 @@ export default async function ProfilePage() {
     }),
   ]);
 
-  if (!user) redirect("/");
+  if (!user) notFound();
 
   return (
-    <ProfileStatsView
-      user={user}
-      tickets={tickets}
-      pvpBets={pvpBets}
-      userId={userId}
-      subtitle="Your betting stats"
-      showSelfLinks
-    />
+    <div className="space-y-6">
+      <Link
+        href="/admin?tab=balances"
+        className="inline-block text-xs text-text-muted hover:text-text-secondary transition-colors"
+      >
+        ← Back to Balances
+      </Link>
+      <ProfileStatsView
+        user={user}
+        tickets={tickets}
+        pvpBets={pvpBets}
+        userId={userId}
+        subtitle="Player betting stats"
+        showSelfLinks={false}
+      />
+    </div>
   );
 }

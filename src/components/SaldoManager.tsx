@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { formatGold } from "./CoinIcon";
 
 type UserSaldo = {
@@ -188,6 +189,12 @@ export default function SaldoManager() {
             <span className="font-semibold text-text-primary">
               {user.alias ?? "Unknown"}
             </span>
+            <Link
+              href={`/admin/users/${user.id}`}
+              className="ml-auto px-2 py-1 text-xs rounded-lg bg-bg-tertiary border border-border-light/30 text-text-secondary hover:text-text-primary transition-colors"
+            >
+              View profile
+            </Link>
           </div>
 
           {/* Gold saldo row */}
