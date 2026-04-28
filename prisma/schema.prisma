@@ -113,11 +113,6 @@ model User {
   activeGambleAmount Float @default(0)
   activeGambleRounds Int   @default(0)
 
-  // Free-spin bonus state (slots). activeFreeSpins > 0 means the user is in a
-  // bonus round; freeSpinStake is the locked stake used for each free spin.
-  activeFreeSpins Int   @default(0)
-  freeSpinStake   Float @default(0)
-
   accounts                 Account[]
   sessions                 Session[]
   createdBets              PvPBet[]          @relation("BetCreator")

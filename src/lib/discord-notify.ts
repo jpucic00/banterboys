@@ -676,72 +676,53 @@ export async function notifySlotWin(spin: {
   multiplier: number;
   currency: "GOLD" | "TIBIA_COINS";
   symbols: readonly string[];
-  bonusTrigger?: boolean;
-  bonusSpinsAwarded?: number;
-  isFreeSpin?: boolean;
+  wildUsed?: boolean;
 }): Promise<void> {
   const player = displayName(spin.user);
   const symbolLine = spin.symbols
     .map((s) => SLOT_SYMBOL_LABELS[s] ?? s)
     .join(" | ");
   const isJackpot = spin.symbols.every((s) => s === "ferumbras");
+  const isTripleJester = spin.symbols.every((s) => s === "joker");
 
   let title: string;
   let description: string;
   let color: number;
-  if (spin.bonusTrigger) {
-    const awarded = spin.bonusSpinsAwarded ?? 10;
-    const jesters = spin.symbols.filter((s) => s === "joker").length;
-    title =
-      jesters >= 3
-        ? `🃏 Jester Strike — ${player} triggered the big bonus!`
-        : `🃏 Jester Pair — ${player} caught a mini-bonus!`;
-    description = `${jesters} Jester Dolls! **${player}** just won ${awarded} free spins at ×2 wins on the Tibia Slots.${siteLink(
-      "view"
-    )}`;
-    color = COLORS.orange;
-  } else if (isJackpot) {
+  if (isJackpot) {
     title = `👑 JACKPOT — ${player} landed 3× Ferumbras!`;
     description = `The Mage King smiles. **${player}** just hit the jackpot on the Tibia Slots.${siteLink(
       "view"
     )}`;
     color = COLORS.orange;
+  } else if (isTripleJester) {
+    title = `🃏 Triple Jester — ${player} aligned three Jesters!`;
+    description = `Three Jester Dolls in a row — pays the Demon Triple. **${player}** hit ×${spin.multiplier} on the Tibia Slots.${siteLink(
+      "view"
+    )}`;
+    color = COLORS.orange;
   } else {
-    title = spin.isFreeSpin
-      ? `🎰 Big Free-Spin Win — ${player}`
-      : `🎰 Big Slot Win — ${player}`;
-    description = `**${player}** hit a ×${spin.multiplier} multiplier on the Tibia Slots${
-      spin.isFreeSpin ? " during a bonus round" : ""
-    }.${siteLink("view")}`;
+    title = `🎰 Big Slot Win — ${player}`;
+    description = `**${player}** hit a ×${spin.multiplier} multiplier${
+      spin.wildUsed ? " (Jester wild)" : ""
+    } on the Tibia Slots.${siteLink("view")}`;
     color = COLORS.green;
   }
 
-  const stakeLabel = spin.isFreeSpin ? "💰 Stake (free spin)" : "💰 Stake";
   const fields: { name: string; value: string; inline?: boolean }[] = [
     { name: "🧑 Player", value: player, inline: true },
     { name: "🎯 Reels", value: symbolLine, inline: false },
     {
-      name: stakeLabel,
+      name: "💰 Stake",
       value: formatCurrency(spin.stake, spin.currency),
       inline: true,
     },
-  ];
-  if (!spin.bonusTrigger) {
-    fields.push(
-      { name: "📈 Multiplier", value: `×${spin.multiplier}`, inline: true },
-      {
-        name: "💎 Payout",
-        value: formatCurrency(Math.round(spin.payout), spin.currency),
-        inline: true,
-      }
-    );
-  } else {
-    fields.push({
-      name: "🎁 Bonus",
-      value: `${spin.bonusSpinsAwarded ?? 10} free spins`,
+    { name: "📈 Multiplier", value: `×${spin.multiplier}`, inline: true },
+    {
+      name: "💎 Payout",
+      value: formatCurrency(Math.round(spin.payout), spin.currency),
       inline: true,
-    });
-  }
+    },
+  ];
 
   await sendWebhook({
     embeds: [

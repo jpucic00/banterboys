@@ -19,8 +19,11 @@ export const SYMBOLS: SlotSymbol[] = [
   "joker",
 ];
 
-// Same weights on all 3 reels. Total = 104. Joker is a scatter: no base payout,
-// 3 jokers triggers the free-spin bonus.
+// Same weights on all 3 reels. Total = 106. Joker is a wild (substitutes for
+// any symbol to form the highest-paying combo) but cannot complete Triple
+// Ferumbras — that 220× jackpot is exclusive to three actual ferumbras. Three
+// jokers pay as Triple Demon (mid-tier prize). Joker weight matches Demon so
+// jesters and demons appear equally often.
 export const REEL_WEIGHTS: Record<SlotSymbol, number> = {
   snake: 42,
   dragon: 25,
@@ -28,26 +31,25 @@ export const REEL_WEIGHTS: Record<SlotSymbol, number> = {
   dark_torturer: 10,
   demon: 6,
   ferumbras: 2,
-  joker: 4,
+  joker: 6,
 };
 
-// Multipliers on stake. 3-of-a-kind always wins over pair. Joker has no
-// entry — it only triggers the bonus when 3 land. Triple multipliers bumped
-// slightly vs. pre-joker to compensate for the weight dilution and keep RTP ~91%.
+// Multipliers on stake. RTP tuned to ~94.6% (margin ~5.4%) under the wild rules
+// above, validated by 10M-spin Monte Carlo. Snake/Dragon have no pair payout.
 export const PAYTABLE = {
   threeOfAKind: {
-    snake: 6,
-    dragon: 9,
-    dragon_lord: 16,
-    dark_torturer: 28,
-    demon: 90,
+    snake: 3,
+    dragon: 5,
+    dragon_lord: 8,
+    dark_torturer: 16,
+    demon: 50,
     ferumbras: 220,
   } as Partial<Record<SlotSymbol, number>>,
   pair: {
-    dragon_lord: 2,
-    dark_torturer: 3,
-    demon: 10,
-    ferumbras: 20,
+    dragon_lord: 1,
+    dark_torturer: 2,
+    demon: 4,
+    ferumbras: 8,
   } as Partial<Record<SlotSymbol, number>>,
 };
 
@@ -73,8 +75,8 @@ export const SYMBOL_LABEL: Record<SlotSymbol, string> = {
 
 // Build a flat weight array once; pick uniformly from it with crypto.randomInt.
 // Dev override: set SLOTS_DEBUG_JOKER_WEIGHT to a positive integer in
-// .env.local to inflate the joker probability so the bonus triggers often
-// enough to test. RTP is off-tune while set — do NOT ship this enabled.
+// .env.local to inflate the joker probability so wild substitution triggers
+// often enough to test. RTP is off-tune while set — do NOT ship this enabled.
 const REEL_STRIP: SlotSymbol[] = (() => {
   const debugJokerWeight = Number(process.env.SLOTS_DEBUG_JOKER_WEIGHT);
   const overrideJoker =
@@ -110,86 +112,118 @@ export function spinReels(): [SlotSymbol, SlotSymbol, SlotSymbol] {
 export type SpinResult = {
   payout: number;
   multiplier: number;
-  kind: "3x" | "2x" | "none" | "bonus";
+  kind: "3x" | "2x" | "none";
   winSymbol: SlotSymbol | null;
-  bonusTrigger: boolean;
-  /** Free spins awarded by this spin (0, FREE_SPINS_AWARDED_PAIR, or FREE_SPINS_AWARDED_TRIPLE). */
-  bonusSpinsAwarded: number;
+  /** True when at least one joker substituted to form the winning combo. */
+  wildUsed: boolean;
 };
+
+const TRIPLE_ORDER: SlotSymbol[] = [
+  "demon",
+  "dark_torturer",
+  "dragon_lord",
+  "dragon",
+  "snake",
+];
+const PAIR_ORDER: SlotSymbol[] = [
+  "ferumbras",
+  "demon",
+  "dark_torturer",
+  "dragon_lord",
+];
 
 export function resolveSpin(
   symbols: [SlotSymbol, SlotSymbol, SlotSymbol],
   stake: number
 ): SpinResult {
-  const [a, b, c] = symbols;
   const jokerCount =
-    (a === "joker" ? 1 : 0) +
-    (b === "joker" ? 1 : 0) +
-    (c === "joker" ? 1 : 0);
+    (symbols[0] === "joker" ? 1 : 0) +
+    (symbols[1] === "joker" ? 1 : 0) +
+    (symbols[2] === "joker" ? 1 : 0);
 
-  // Scatter bonus tiers: 3 jokers → big bonus, 2 jokers → small bonus. Both
-  // pay nothing directly; the award is free spins at a multiplier.
+  // Three jokers — Triple Jester pays as Triple Demon (mid-tier, not jackpot).
   if (jokerCount === 3) {
-    return {
-      payout: 0,
-      multiplier: 0,
-      kind: "bonus",
-      winSymbol: "joker",
-      bonusTrigger: true,
-      bonusSpinsAwarded: FREE_SPINS_AWARDED_TRIPLE,
-    };
-  }
-  if (jokerCount === 2) {
-    return {
-      payout: 0,
-      multiplier: 0,
-      kind: "bonus",
-      winSymbol: "joker",
-      bonusTrigger: true,
-      bonusSpinsAwarded: FREE_SPINS_AWARDED_PAIR,
-    };
-  }
-
-  if (a === b && b === c) {
-    const m = PAYTABLE.threeOfAKind[a];
-    if (m) {
-      return {
-        payout: stake * m,
-        multiplier: m,
-        kind: "3x",
-        winSymbol: a,
-        bonusTrigger: false,
-        bonusSpinsAwarded: 0,
-      };
-    }
-  }
-
-  // Find which symbol appears exactly twice (at most one can in 3 reels if not all same).
-  let pairSymbol: SlotSymbol | null = null;
-  if (a === b) pairSymbol = a;
-  else if (a === c) pairSymbol = a;
-  else if (b === c) pairSymbol = b;
-
-  if (pairSymbol && pairSymbol in PAYTABLE.pair) {
-    const m = PAYTABLE.pair[pairSymbol]!;
+    const m = PAYTABLE.threeOfAKind.demon!;
     return {
       payout: stake * m,
       multiplier: m,
-      kind: "2x",
-      winSymbol: pairSymbol,
-      bonusTrigger: false,
-      bonusSpinsAwarded: 0,
+      kind: "3x",
+      winSymbol: "joker",
+      wildUsed: true,
+    };
+  }
+
+  let bestMultiplier = 0;
+  let bestKind: "3x" | "2x" | "none" = "none";
+  let bestSymbol: SlotSymbol | null = null;
+
+  // Triple Ferumbras — jackpot is exclusive to three actual ferumbras
+  // (jokers cannot substitute to reach it).
+  if (
+    symbols[0] === "ferumbras" &&
+    symbols[1] === "ferumbras" &&
+    symbols[2] === "ferumbras"
+  ) {
+    const m = PAYTABLE.threeOfAKind.ferumbras!;
+    if (m > bestMultiplier) {
+      bestMultiplier = m;
+      bestKind = "3x";
+      bestSymbol = "ferumbras";
+    }
+  }
+
+  // Triples for non-Ferumbras symbols — jokers substitute freely.
+  for (const s of TRIPLE_ORDER) {
+    const count = countOf(symbols, s) + jokerCount;
+    if (count >= 3) {
+      const m = PAYTABLE.threeOfAKind[s];
+      if (m && m > bestMultiplier) {
+        bestMultiplier = m;
+        bestKind = "3x";
+        bestSymbol = s;
+      }
+    }
+  }
+
+  // Pairs — jokers substitute including for Ferumbras pair.
+  for (const s of PAIR_ORDER) {
+    const count = countOf(symbols, s) + jokerCount;
+    if (count >= 2) {
+      const m = PAYTABLE.pair[s];
+      if (m && m > bestMultiplier) {
+        bestMultiplier = m;
+        bestKind = "2x";
+        bestSymbol = s;
+      }
+    }
+  }
+
+  if (bestKind === "none" || bestSymbol === null) {
+    return {
+      payout: 0,
+      multiplier: 0,
+      kind: "none",
+      winSymbol: null,
+      wildUsed: false,
     };
   }
 
   return {
-    payout: 0,
-    multiplier: 0,
-    kind: "none",
-    winSymbol: null,
-    bonusTrigger: false,
-    bonusSpinsAwarded: 0,
+    payout: stake * bestMultiplier,
+    multiplier: bestMultiplier,
+    kind: bestKind,
+    winSymbol: bestSymbol,
+    wildUsed: jokerCount > 0,
   };
+}
+
+function countOf(
+  symbols: readonly SlotSymbol[],
+  s: SlotSymbol
+): number {
+  let c = 0;
+  for (const x of symbols) if (x === s) c++;
+  return c;
 }
 
 // Stake bounds — single source of truth for validation + UI.
@@ -200,7 +234,7 @@ export const STAKE_LIMITS = {
 } as const;
 
 export const BIG_WIN_MULTIPLIER = 10; // UI tier: green cabinet + green chip
-export const DISCORD_NOTIFY_MULTIPLIER = 20; // >= this triggers a Discord webhook
+export const DISCORD_NOTIFY_MULTIPLIER = 15; // >= this triggers a Discord webhook
 
 // Max Tibia Coin debt a player is allowed to carry FROM SLOTS. If a spin would
 // push saldoTibiaCoins below -MAX_SLOT_DEBT, the server rejects it.
@@ -210,12 +244,3 @@ export const MAX_SLOT_DEBT = 500;
 // face-down cards hides the Ferumbras. Right = winnings double; wrong = lose it.
 export const GAMBLE_CARDS = 2;
 export const MAX_GAMBLE_ROUNDS = 5;
-
-// Free-spin bonus tiers. Jesters are scatter symbols: 3 on the payline awards
-// the big bonus, 2 awards a smaller one. Both lock the triggering stake.
-// Retriggers during the bonus round stack the awards. All wins during the
-// bonus are multiplied by FREE_SPIN_WIN_MULTIPLIER.
-export const FREE_SPINS_AWARDED_TRIPLE = 10;
-export const FREE_SPINS_AWARDED_PAIR = 2;
-export const FREE_SPIN_WIN_MULTIPLIER = 2;
-export const FREE_SPIN_TRIGGER_COUNT = 3;

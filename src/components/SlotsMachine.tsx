@@ -15,9 +15,6 @@ import {
   MAX_SLOT_DEBT,
   GAMBLE_CARDS,
   MAX_GAMBLE_ROUNDS,
-  FREE_SPINS_AWARDED_PAIR,
-  FREE_SPINS_AWARDED_TRIPLE,
-  FREE_SPIN_WIN_MULTIPLIER,
 } from "@/lib/slots";
 
 type SpinUser = {
@@ -33,7 +30,7 @@ type SpinHistoryItem = {
   multiplier: number;
   symbols: string;
   currency: string;
-  isFreeSpin: boolean;
+  isFreeSpin: boolean; // legacy historical flag — never true for new spins
   createdAt: Date | string;
   user: SpinUser;
 };
@@ -45,11 +42,7 @@ type SpinResponse = {
   multiplier: number;
   stake: number;
   newBalance: number;
-  bonusTrigger: boolean;
-  bonusSpinsAwarded: number;
-  isFreeSpin: boolean;
-  activeFreeSpins: number;
-  freeSpinStake: number;
+  wildUsed: boolean;
   activeGambleAmount: number;
   activeGambleRounds: number;
 };
@@ -80,34 +73,47 @@ const GAMBLE_PANEL_HEIGHT = 232;
 function deriveWinningPositions(
   symbols: SlotSymbol[] | null,
   multiplier: number,
-  bonusTrigger: boolean
+  winSymbol: SlotSymbol | null,
+  kind: "3x" | "2x" | "none"
 ): [boolean, boolean, boolean] {
-  if (!symbols) return [false, false, false];
-  // Bonus trigger: pulse the joker cells (all 3 for triple, just the 2 for pair).
-  if (bonusTrigger) {
-    return symbols.map((s) => s === "joker") as [boolean, boolean, boolean];
+  if (!symbols || multiplier === 0 || !winSymbol || kind === "none") {
+    return [false, false, false];
   }
-  if (multiplier === 0) return [false, false, false];
-  const [a, b, c] = symbols;
-  if (a === b && b === c) return [true, true, true];
-  if (a === b) return [true, true, false];
-  if (a === c) return [true, false, true];
-  if (b === c) return [false, true, true];
-  return [false, false, false];
+  // Triple Jester (winSymbol === "joker") and any wild-completed triple/pair —
+  // pulse positions matching winSymbol AND any joker tiles that contributed
+  // via wild substitution.
+  if (kind === "3x") {
+    return [true, true, true];
+  }
+  // Pair: pulse positions of winSymbol plus jokers (substitutes), capped at 2.
+  const positions: [boolean, boolean, boolean] = [false, false, false];
+  let highlighted = 0;
+  // Prefer actual symbol matches first so jokers fill remaining slots.
+  for (let i = 0; i < 3 && highlighted < 2; i++) {
+    if (symbols[i] === winSymbol) {
+      positions[i] = true;
+      highlighted++;
+    }
+  }
+  for (let i = 0; i < 3 && highlighted < 2; i++) {
+    if (!positions[i] && symbols[i] === "joker") {
+      positions[i] = true;
+      highlighted++;
+    }
+  }
+  return positions;
 }
 
 export default function SlotsMachine({
   isLoggedIn,
   initialSaldo,
   initialGamble,
-  initialFreeSpin,
   initialSpins,
   currentUser,
 }: {
   isLoggedIn: boolean;
   initialSaldo: { saldoTibiaCoins: number };
   initialGamble: { activeGambleAmount: number; activeGambleRounds: number };
-  initialFreeSpin: { activeFreeSpins: number; freeSpinStake: number };
   initialSpins: SpinHistoryItem[];
   currentUser: SpinUser | null;
 }) {
@@ -131,24 +137,7 @@ export default function SlotsMachine({
   const [gambling, setGambling] = useState(false);
   const [gambleReveal, setGambleReveal] = useState<GambleReveal | null>(null);
 
-  // Free-spin bonus state
-  const [freeSpinsRemaining, setFreeSpinsRemaining] = useState<number>(
-    initialFreeSpin.activeFreeSpins
-  );
-  const [lockedFreeSpinStake, setLockedFreeSpinStake] = useState<number>(
-    initialFreeSpin.freeSpinStake
-  );
-  // Tracks whether we just triggered the bonus (for a full-size banner) or
-  // retriggered mid-bonus (for a small "+N spins" banner).
-  const [bonusBanner, setBonusBanner] = useState<
-    { kind: "trigger" | "retrigger"; key: string; spins: number; jokers: 2 | 3 } | null
-  >(null);
-  const bonusBannerTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const inBonus = freeSpinsRemaining > 0;
-  // Effective stake for button labels and server requests. During the bonus
-  // the server ignores the client value, but we display the locked stake.
-  const stake = inBonus ? lockedFreeSpinStake : typedStake;
+  const stake = typedStake;
 
   const revealTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const gambleRevealTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -157,7 +146,6 @@ export default function SlotsMachine({
     return () => {
       if (revealTimer.current) clearTimeout(revealTimer.current);
       if (gambleRevealTimer.current) clearTimeout(gambleRevealTimer.current);
-      if (bonusBannerTimer.current) clearTimeout(bonusBannerTimer.current);
     };
   }, []);
 
@@ -189,20 +177,17 @@ export default function SlotsMachine({
     };
   }, [spinning]);
 
-  const worstCaseBalance = inBonus ? balance : balance - stake;
-  // Debt cap doesn't apply to free spins (no stake at risk).
-  const debtLimitHit = isLoggedIn && !inBonus && worstCaseBalance < -MAX_SLOT_DEBT;
+  const worstCaseBalance = balance - stake;
+  const debtLimitHit = isLoggedIn && worstCaseBalance < -MAX_SLOT_DEBT;
 
   const canSpin =
     isLoggedIn &&
     !spinning &&
-    (inBonus ||
-      (stake >= STAKE_LIMITS.TIBIA_COINS.min &&
-        stake <= STAKE_LIMITS.TIBIA_COINS.max &&
-        !debtLimitHit));
+    stake >= STAKE_LIMITS.TIBIA_COINS.min &&
+    stake <= STAKE_LIMITS.TIBIA_COINS.max &&
+    !debtLimitHit;
 
-  const willGoNegative =
-    isLoggedIn && !inBonus && worstCaseBalance < 0 && !debtLimitHit;
+  const willGoNegative = isLoggedIn && worstCaseBalance < 0 && !debtLimitHit;
 
   async function handleSpin() {
     if (!canSpin) return;
@@ -232,34 +217,15 @@ export default function SlotsMachine({
 
       const data = (await res.json()) as SpinResponse;
       setLastResult(data);
-      const triggeredMidBonus = data.bonusTrigger && data.isFreeSpin;
-      const triggeredFromPaid = data.bonusTrigger && !data.isFreeSpin;
 
-      // Let the last reel finish before updating balance / flipping UI / showing banner.
+      // Let the last reel finish before updating balance / flipping UI.
       if (revealTimer.current) clearTimeout(revealTimer.current);
       revealTimer.current = setTimeout(() => {
         setBalance(data.newBalance);
         setGambleAmount(data.activeGambleAmount);
         setGambleRounds(data.activeGambleRounds);
-        setFreeSpinsRemaining(data.activeFreeSpins);
-        setLockedFreeSpinStake(data.freeSpinStake);
         setSpinning(false);
         setResultVisible(true);
-
-        if (triggeredFromPaid || triggeredMidBonus) {
-          const jokers = data.symbols.filter((s) => s === "joker").length as 2 | 3;
-          if (bonusBannerTimer.current) clearTimeout(bonusBannerTimer.current);
-          setBonusBanner({
-            kind: triggeredMidBonus ? "retrigger" : "trigger",
-            key: data.spinId,
-            spins: data.bonusSpinsAwarded,
-            jokers,
-          });
-          bonusBannerTimer.current = setTimeout(
-            () => setBonusBanner(null),
-            triggeredMidBonus ? 2000 : 3200
-          );
-        }
 
         // Add to local history (prepend the current user's spin)
         setHistory((h) =>
@@ -271,7 +237,7 @@ export default function SlotsMachine({
               multiplier: data.multiplier,
               symbols: data.symbols.join(","),
               currency: "TIBIA_COINS",
-              isFreeSpin: data.isFreeSpin,
+              isFreeSpin: false,
               createdAt: new Date(),
               user: currentUser ?? { name: null, alias: null, image: null },
             },
@@ -367,35 +333,81 @@ export default function SlotsMachine({
   }
 
   const targets = lastResult?.symbols ?? null;
-  const isBonusTrigger =
-    resultVisible && !!lastResult && lastResult.bonusTrigger;
+  const isTripleJester =
+    resultVisible &&
+    !!lastResult &&
+    lastResult.symbols.every((s) => s === "joker");
   const isJackpot =
     resultVisible &&
-    !isBonusTrigger &&
-    lastResult?.symbols.every((s) => s === "ferumbras");
+    !!lastResult &&
+    lastResult.symbols.every((s) => s === "ferumbras") &&
+    lastResult.multiplier > 0;
   const isBigWin =
     resultVisible &&
     !!lastResult &&
-    !lastResult.bonusTrigger &&
+    !isJackpot &&
+    !isTripleJester &&
     lastResult.multiplier >= BIG_WIN_MULTIPLIER;
   const isSmallWin =
     resultVisible &&
     !!lastResult &&
-    !lastResult.bonusTrigger &&
+    !isJackpot &&
+    !isTripleJester &&
     lastResult.multiplier > 0 &&
     lastResult.multiplier < BIG_WIN_MULTIPLIER;
   const isLoss =
-    resultVisible &&
-    !!lastResult &&
-    !lastResult.bonusTrigger &&
-    lastResult.multiplier === 0;
-  const isWin = !!(isBigWin || isSmallWin);
+    resultVisible && !!lastResult && lastResult.multiplier === 0;
+  const isWin = !!(isBigWin || isSmallWin || isTripleJester);
+
+  // Resolve winSymbol + kind locally for win-position highlighting.
+  const winSymbol: SlotSymbol | null = (() => {
+    if (!lastResult || lastResult.multiplier === 0) return null;
+    const syms = lastResult.symbols;
+    if (syms.every((s) => s === "joker")) return "joker";
+    // Triple Ferumbras (no joker)
+    if (syms.every((s) => s === "ferumbras")) return "ferumbras";
+    // Triples for non-Ferumbras symbols (jokers may substitute)
+    const jokerCount = syms.filter((s) => s === "joker").length;
+    const order: SlotSymbol[] = [
+      "demon",
+      "dark_torturer",
+      "dragon_lord",
+      "dragon",
+      "snake",
+    ];
+    const tripleMatch = order.find(
+      (s) => syms.filter((x) => x === s).length + jokerCount >= 3
+    );
+    if (tripleMatch) return tripleMatch;
+    const pairOrder: SlotSymbol[] = [
+      "ferumbras",
+      "demon",
+      "dark_torturer",
+      "dragon_lord",
+    ];
+    const pairMatch = pairOrder.find(
+      (s) => syms.filter((x) => x === s).length + jokerCount >= 2
+    );
+    return pairMatch ?? null;
+  })();
+  const winKind: "3x" | "2x" | "none" =
+    !lastResult || lastResult.multiplier === 0
+      ? "none"
+      : isJackpot || isTripleJester
+        ? "3x"
+        : winSymbol &&
+            lastResult.symbols.filter(
+              (s) => s === winSymbol || s === "joker"
+            ).length >= 3
+          ? "3x"
+          : "2x";
 
   // Which middle-row cells are part of the winning combo (for symbol pulse).
   const winningPositions = deriveWinningPositions(
     lastResult?.symbols ?? null,
     lastResult?.multiplier ?? 0,
-    !!lastResult?.bonusTrigger
+    winSymbol,
+    winKind
   );
 
   return (
@@ -404,43 +416,10 @@ export default function SlotsMachine({
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <p className="text-text-muted text-xs">
-            Match 3 symbols for big payouts. 2 Jesters award {FREE_SPINS_AWARDED_PAIR}, 3 award {FREE_SPINS_AWARDED_TRIPLE} free spins at ×{FREE_SPIN_WIN_MULTIPLIER}.
+            Match 3 symbols for big payouts. The Jester is wild — substitutes for any symbol except to complete Triple Ferumbras.
           </p>
         </div>
         <div className="flex items-center gap-2">
-          {isLoggedIn && inBonus && (
-            <div
-              className="px-3 py-2 rounded-md text-xs"
-              style={{
-                background: "#1a1224",
-                border: "1px solid #A855F7",
-                boxShadow: "0 0 12px rgba(168, 85, 247, 0.35)",
-              }}
-            >
-              <div
-                className="uppercase tracking-wide text-[10px] mb-0.5 font-bold flex items-center gap-1.5"
-                style={{ color: "#A855F7" }}
-              >
-                <span>🃏 Free Spins</span>
-                <span
-                  className="font-mono text-[9px] px-1 rounded"
-                  style={{
-                    background: "rgba(240, 168, 24, 0.2)",
-                    color: "#F0A818",
-                    border: "1px solid #F0A818",
-                    letterSpacing: "0.03em",
-                  }}
-                >
-                  ×{FREE_SPIN_WIN_MULTIPLIER}
-                </span>
-              </div>
-              <div className="font-mono">
-                <span style={{ color: "#fff" }}>
-                  {freeSpinsRemaining} left
-                </span>
-              </div>
-            </div>
-          )}
           {isLoggedIn && (
             <div
               className="px-3 py-2 rounded-md text-xs"
@@ -475,7 +454,7 @@ export default function SlotsMachine({
             isJackpot={!!isJackpot}
             isBigWin={!!isBigWin}
             isWin={isWin}
-            isBonus={!!isBonusTrigger}
+            isTripleJester={!!isTripleJester}
             resultKey={resultVisible ? lastResult?.spinId ?? null : null}
           >
             {[0, 1, 2].map((i) => (
@@ -488,7 +467,6 @@ export default function SlotsMachine({
                 spinning={spinning}
                 winning={winningPositions[i]}
                 jackpot={!!isJackpot}
-                bonus={!!isBonusTrigger}
               />
             ))}
           </SlotCabinet>
@@ -499,48 +477,7 @@ export default function SlotsMachine({
           className="text-center h-11 mb-3 flex items-center justify-center"
           aria-live="polite"
         >
-          {bonusBanner?.kind === "trigger" && (
-            <div
-              key={`bt-${bonusBanner.key}`}
-              className="px-5 py-2 rounded-md font-black uppercase tracking-widest text-sm flex items-center gap-2"
-              style={{
-                background:
-                  bonusBanner.jokers >= 3
-                    ? "linear-gradient(to right, #A855F7, #F0A818, #A855F7)"
-                    : "linear-gradient(to right, #6B21A8, #A855F7, #6B21A8)",
-                color: "#1a1a1a",
-                boxShadow:
-                  bonusBanner.jokers >= 3
-                    ? "0 0 24px rgba(168, 85, 247, 0.8)"
-                    : "0 0 16px rgba(168, 85, 247, 0.55)",
-                animation:
-                  "slots-banner-pop 450ms cubic-bezier(0.34, 1.56, 0.64, 1) both",
-              }}
-            >
-              <span>🃏</span>
-              <span>
-                {bonusBanner.jokers} JESTERS — {bonusBanner.spins} FREE SPINS × {FREE_SPIN_WIN_MULTIPLIER}
-              </span>
-              <span>🃏</span>
-            </div>
-          )}
-          {bonusBanner?.kind === "retrigger" && (
-            <div
-              key={`br-${bonusBanner.key}`}
-              className="px-4 py-2 rounded-md font-bold uppercase tracking-wide text-sm"
-              style={{
-                background: "#A855F722",
-                color: "#A855F7",
-                border: "1px solid #A855F7",
-                boxShadow: "0 0 14px rgba(168, 85, 247, 0.4)",
-                animation:
-                  "slots-banner-pop 400ms cubic-bezier(0.34, 1.56, 0.64, 1) both",
-              }}
-            >
-              +{bonusBanner.spins} Free Spins!
-            </div>
-          )}
-          {!bonusBanner && isJackpot && (
+          {isJackpot && (
             <div
               key={`jp-${lastResult?.spinId}`}
               className="px-5 py-2 rounded-md font-black uppercase tracking-widest text-sm"
@@ -556,7 +493,24 @@ export default function SlotsMachine({
               👑 JACKPOT × {lastResult?.multiplier}
             </div>
           )}
-          {isBigWin && !isJackpot && (
+          {isTripleJester && (
+            <div
+              key={`tj-${lastResult?.spinId}`}
+              className="px-5 py-2 rounded-md font-black uppercase tracking-widest text-sm flex items-center gap-2"
+              style={{
+                background: "linear-gradient(to right, #6B21A8, #A855F7, #6B21A8)",
+                color: "#1a1a1a",
+                boxShadow: "0 0 18px rgba(168, 85, 247, 0.6)",
+                animation:
+                  "slots-banner-pop 450ms cubic-bezier(0.34, 1.56, 0.64, 1) both",
+              }}
+            >
+              <span>🃏</span>
+              <span>Triple Jester × {lastResult?.multiplier}</span>
+              <span>🃏</span>
+            </div>
+          )}
+          {isBigWin && !isJackpot && !isTripleJester && (
             <div
               key={`bw-${lastResult?.spinId}`}
               className="px-4 py-2 rounded-md font-bold uppercase tracking-wide text-sm"
@@ -628,16 +582,15 @@ export default function SlotsMachine({
         <div className="flex flex-wrap items-end gap-3 justify-center">
           <div>
             <label className="block text-[10px] uppercase tracking-widest text-text-muted mb-1">
-              {inBonus ? "Stake (locked)" : "Stake (TC)"}
+              Stake (TC)
             </label>
             <input
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
               maxLength={3}
-              value={inBonus ? String(lockedFreeSpinStake) : stakeInput}
+              value={stakeInput}
               onChange={(e) => {
-                if (inBonus) return;
                 const raw = e.target.value.replace(/\D/g, "").slice(0, 3);
                 // Strip leading zeros unless the value is just "" or "0"
                 const cleaned =
@@ -645,7 +598,6 @@ export default function SlotsMachine({
                 setStakeInput(cleaned);
               }}
               onBlur={() => {
-                if (inBonus) return;
                 if (stakeInput === "" || typedStake === 0) {
                   setStakeInput(String(STAKE_LIMITS.TIBIA_COINS.min));
                 } else if (typedStake > STAKE_LIMITS.TIBIA_COINS.max) {
@@ -654,16 +606,15 @@ export default function SlotsMachine({
                   setStakeInput(String(typedStake));
                 }
               }}
-              disabled={spinning || inBonus}
+              disabled={spinning}
               className="w-28 text-center font-mono"
               style={{
                 background: "#0a0a0a",
-                border: `1px solid ${inBonus ? "#A855F744" : "#2e2e2e"}`,
+                border: "1px solid #2e2e2e",
                 borderRadius: 6,
                 color: "#fff",
                 padding: "8px 10px",
                 fontSize: 14,
-                opacity: inBonus ? 0.85 : 1,
               }}
             />
           </div>
@@ -671,7 +622,7 @@ export default function SlotsMachine({
           <div className="flex items-end gap-1.5">
             {presets.map((p) => {
               const selected = stake === p;
-              const disabled = spinning || inBonus;
+              const disabled = spinning;
               return (
                 <button
                   key={p}
@@ -703,9 +654,7 @@ export default function SlotsMachine({
               disabled={!canSpin}
               style={{
                 background: canSpin
-                  ? inBonus
-                    ? "linear-gradient(to bottom, #F0A818, #8a5d0b)"
-                    : "linear-gradient(to bottom, #A855F7, #7E22CE)"
+                  ? "linear-gradient(to bottom, #A855F7, #7E22CE)"
                   : "#2a2a2a",
                 color: canSpin ? "#fff" : "#666",
                 border: "none",
@@ -717,20 +666,14 @@ export default function SlotsMachine({
                 textTransform: "uppercase",
                 cursor: canSpin ? "pointer" : "not-allowed",
                 boxShadow: canSpin
-                  ? inBonus
-                    ? "0 2px 10px rgba(240, 168, 24, 0.5)"
-                    : "0 2px 8px rgba(168, 85, 247, 0.4)"
+                  ? "0 2px 8px rgba(168, 85, 247, 0.4)"
                   : "none",
                 transition: "background 0.15s, color 0.15s, box-shadow 0.15s",
                 minWidth: 160,
                 textAlign: "center",
               }}
             >
-              {spinning
-                ? "Spinning…"
-                : inBonus
-                  ? `Free Spin (${freeSpinsRemaining} left)`
-                  : "Spin"}
+              {spinning ? "Spinning…" : "Spin"}
             </button>
           ) : (
             <button
@@ -779,14 +722,6 @@ export default function SlotsMachine({
             Playing on credit — your balance will go negative.
           </p>
         )}
-        {inBonus && (
-          <p
-            className="text-center text-xs mt-3 font-medium"
-            style={{ color: "#A855F7" }}
-          >
-            Bonus round — stake locked, wins pay ×{FREE_SPIN_WIN_MULTIPLIER}, gamble each hit.
-          </p>
-        )}
       </div>
 
       {/* Paytable */}
@@ -803,21 +738,21 @@ function SlotCabinet({
   isJackpot,
   isBigWin,
   isWin,
-  isBonus,
+  isTripleJester,
   resultKey,
 }: {
   children: React.ReactNode;
   isJackpot: boolean;
   isBigWin: boolean;
   isWin: boolean;
-  isBonus: boolean;
+  isTripleJester: boolean;
   /** Changes when a win is revealed — used to re-trigger one-shot animations. */
   resultKey: string | null;
 }) {
   // Where the middle row sits inside a reel: after top padding + one CELL.
   const middleRowTopOffset = PADDING + CELL;
 
-  const paylineColor = isBonus
+  const paylineColor = isTripleJester
     ? "#A855F7"
     : isJackpot
       ? "#F0A818"
@@ -826,7 +761,7 @@ function SlotCabinet({
         : isWin
           ? "#00c85399"
           : "#A855F788";
-  const paylineGlow = isBonus
+  const paylineGlow = isTripleJester
     ? "0 0 18px rgba(168, 85, 247, 0.6), 0 0 4px rgba(168, 85, 247, 0.9)"
     : isJackpot
       ? "0 0 18px rgba(240, 168, 24, 0.55), 0 0 4px rgba(240, 168, 24, 0.9)"
@@ -842,22 +777,22 @@ function SlotCabinet({
 
   useEffect(() => {
     if (!resultKey) return;
-    if ((isJackpot || isBonus) && cabinetRef.current) {
+    if ((isJackpot || isTripleJester) && cabinetRef.current) {
       const el = cabinetRef.current;
       el.style.animation = "none";
       // Force reflow so the animation restarts on the next frame.
       void el.offsetHeight;
-      el.style.animation = isBonus
+      el.style.animation = isTripleJester
         ? "slots-cabinet-shake 0.6s cubic-bezier(.36,.07,.19,.97) both, slots-cabinet-flash-bonus 1.1s ease-out both"
         : "slots-cabinet-shake 0.6s cubic-bezier(.36,.07,.19,.97) both, slots-cabinet-flash 1.1s ease-out both";
     }
-    if ((isWin || isBonus) && paylineRef.current) {
+    if ((isWin || isTripleJester) && paylineRef.current) {
       const el = paylineRef.current;
       el.style.animation = "none";
       void el.offsetHeight;
       el.style.animation = "slots-payline-flash 0.8s ease-out both";
     }
-  }, [resultKey, isJackpot, isWin, isBonus]);
+  }, [resultKey, isJackpot, isWin, isTripleJester]);
 
   return (
     <div
@@ -1156,6 +1091,7 @@ function GamblePanel({
 }
 
 function Paytable() {
+  const tripleDemonMult = PAYTABLE.threeOfAKind.demon ?? 0;
   const threeOfAKindEntries = (
     Object.entries(PAYTABLE.threeOfAKind) as [SlotSymbol, number][]
   ).sort((a, b) => b[1] - a[1]);
@@ -1200,7 +1136,8 @@ function Paytable() {
         </div>
       </div>
 
-      {/* Jester bonus tiers — scatter rewards, paid in free spins at ×2 wins. */}
+      {/* Joker (Wild) — substitutes for any symbol but cannot complete the
+          Triple Ferumbras jackpot (that's exclusive to three actual ferumbras). */}
       <div
         className="p-3"
         style={{ borderTop: "1px solid #252525", background: "#0f0a18" }}
@@ -1209,63 +1146,56 @@ function Paytable() {
           className="text-[10px] uppercase tracking-wide mb-2 font-bold"
           style={{ color: "#A855F7" }}
         >
-          🃏 Jester Bonus
+          🃏 Jester (Wild)
         </div>
         <div className="space-y-1.5">
-          <BonusRow
-            jokers={3}
-            reward={`${FREE_SPINS_AWARDED_TRIPLE} free spins × ${FREE_SPIN_WIN_MULTIPLIER}`}
-            tone="big"
-          />
-          <BonusRow
-            jokers={2}
-            reward={`${FREE_SPINS_AWARDED_PAIR} free spins × ${FREE_SPIN_WIN_MULTIPLIER}`}
-            tone="small"
-          />
+          <div className="flex items-center justify-between gap-2 text-sm">
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Image
+                  src={SPRITE_PATH.joker}
+                  alt=""
+                  width={20}
+                  height={20}
+                  style={{ imageRendering: "pixelated" }}
+                />
+              </div>
+              <span className="text-text-secondary text-xs ml-1">
+                1–2 Jesters substitute for any symbol to make the best paying combo
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center justify-between gap-2 text-sm">
+            <div className="flex items-center gap-1.5 min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 shrink-0">
+                {[0, 1, 2].map((i) => (
+                  <Image
+                    key={i}
+                    src={SPRITE_PATH.joker}
+                    alt=""
+                    width={20}
+                    height={20}
+                    style={{ imageRendering: "pixelated" }}
+                  />
+                ))}
+              </div>
+              <span className="text-text-secondary text-xs ml-1 truncate">
+                Triple Jester
+              </span>
+            </div>
+            <span
+              className="font-mono text-xs shrink-0 whitespace-nowrap"
+              style={{ color: "#F0A818" }}
+            >
+              × {tripleDemonMult}
+            </span>
+          </div>
           <div className="text-[10px] text-text-muted italic pt-1">
-            Jesters pay no multiplier on their own — they trigger free spins
-            (wins pay ×{FREE_SPIN_WIN_MULTIPLIER} during the bonus).
+            Jesters cannot complete the 220× Triple Ferumbras jackpot — that's
+            reserved for three actual ferumbras.
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-function BonusRow({
-  jokers,
-  reward,
-  tone,
-}: {
-  jokers: 2 | 3;
-  reward: string;
-  tone: "big" | "small";
-}) {
-  return (
-    <div className="flex items-center justify-between gap-2 text-sm">
-      <div className="flex items-center gap-1.5 min-w-0 flex-1">
-        <div className="flex items-center gap-1.5 shrink-0">
-          {Array.from({ length: jokers }).map((_, i) => (
-            <Image
-              key={i}
-              src={SPRITE_PATH.joker}
-              alt=""
-              width={20}
-              height={20}
-              style={{ imageRendering: "pixelated" }}
-            />
-          ))}
-        </div>
-        <span className="text-text-secondary text-xs ml-1 truncate">
-          {jokers} Jester{jokers > 1 ? "s" : ""}
-        </span>
-      </div>
-      <span
-        className="font-mono text-xs shrink-0 whitespace-nowrap"
-        style={{ color: tone === "big" ? "#F0A818" : "#A855F7" }}
-      >
-        {reward}
-      </span>
     </div>
   );
 }
@@ -1308,11 +1238,11 @@ function PayRow({
   );
 }
 
-type SpinTier = "jackpot" | "big" | "small" | "loss" | "bonus";
+type SpinTier = "jackpot" | "tripleJester" | "big" | "small" | "loss";
 
 function spinTier(symbols: SlotSymbol[], multiplier: number): SpinTier {
-  if (symbols.every((s) => s === "joker")) return "bonus";
   if (symbols.every((s) => s === "ferumbras") && multiplier > 0) return "jackpot";
+  if (symbols.every((s) => s === "joker") && multiplier > 0) return "tripleJester";
   if (multiplier >= BIG_WIN_MULTIPLIER) return "big";
   if (multiplier > 0) return "small";
   return "loss";
@@ -1354,7 +1284,7 @@ const TIER_STYLES: Record<
     chipBorder: "transparent",
     text: "#ef4444",
   },
-  bonus: {
+  tripleJester: {
     border: "#A855F7",
     bg: "rgba(168, 85, 247, 0.08)",
     chipBg: "rgba(168, 85, 247, 0.2)",
@@ -1414,8 +1344,8 @@ function RecentSpins({ spins }: { spins: SpinHistoryItem[] }) {
           const tier = spinTier(syms, s.multiplier);
           const styles = TIER_STYLES[tier];
           const playerName = s.user.alias ?? s.user.name ?? "Unknown";
-          const won = tier !== "loss" && tier !== "bonus";
-          const isBonus = tier === "bonus";
+          const won = tier !== "loss";
+          const isTripleJesterRow = tier === "tripleJester";
           return (
             <div
               key={s.id}
@@ -1446,20 +1376,6 @@ function RecentSpins({ spins }: { spins: SpinHistoryItem[] }) {
                     <span className="text-xs text-text-secondary truncate font-medium">
                       {playerName}
                     </span>
-                    {s.isFreeSpin && (
-                      <span
-                        className="font-mono text-[9px] font-bold px-1 py-0.5 rounded shrink-0"
-                        style={{
-                          background: "rgba(168, 85, 247, 0.18)",
-                          color: "#A855F7",
-                          border: "1px solid #A855F7",
-                          letterSpacing: "0.05em",
-                        }}
-                        title="Awarded by the Jester bonus"
-                      >
-                        FREE
-                      </span>
-                    )}
                   </div>
                   <div
                     className="text-[10px] text-text-muted font-mono"
@@ -1496,20 +1412,6 @@ function RecentSpins({ spins }: { spins: SpinHistoryItem[] }) {
 
               {/* Multiplier chip + result */}
               <div className="flex items-center gap-2 ml-auto flex-shrink-0">
-                {isBonus && (
-                  <span
-                    className="font-mono font-bold text-[11px] px-1.5 py-0.5 rounded"
-                    style={{
-                      background: styles.chipBg,
-                      color: styles.chipColor,
-                      border: `1px solid ${styles.chipBorder}`,
-                      letterSpacing: "0.05em",
-                    }}
-                    title="Triggered the free-spin bonus"
-                  >
-                    🃏 BONUS
-                  </span>
-                )}
                 {won && (
                   <span
                     className="font-mono font-bold text-[11px] px-1.5 py-0.5 rounded"
@@ -1519,33 +1421,40 @@ function RecentSpins({ spins }: { spins: SpinHistoryItem[] }) {
                       border: `1px solid ${styles.chipBorder}`,
                       letterSpacing: "0.02em",
                     }}
-                    title={tier === "jackpot" ? "Jackpot!" : tier === "big" ? "Big win" : "Win"}
+                    title={
+                      tier === "jackpot"
+                        ? "Jackpot!"
+                        : tier === "tripleJester"
+                          ? "Triple Jester"
+                          : tier === "big"
+                            ? "Big win"
+                            : "Win"
+                    }
                   >
                     {tier === "jackpot" && "👑 "}
+                    {isTripleJesterRow && "🃏 "}
                     ×{s.multiplier}
                   </span>
                 )}
-                {!isBonus && (
-                  <span
-                    className="font-mono text-xs flex items-center gap-1"
-                    style={{ color: styles.text }}
-                  >
-                    {won ? "+" : s.isFreeSpin ? "" : "−"}
-                    <CoinAmount
-                      amount={
-                        won
-                          ? s.isFreeSpin
-                            ? s.payout
-                            : s.payout - s.stake
-                          : s.isFreeSpin
-                            ? 0
-                            : s.stake
-                      }
-                      currency={s.currency}
-                      size={12}
-                    />
-                  </span>
-                )}
+                <span
+                  className="font-mono text-xs flex items-center gap-1"
+                  style={{ color: styles.text }}
+                >
+                  {won ? "+" : s.isFreeSpin ? "" : "−"}
+                  <CoinAmount
+                    amount={
+                      won
+                        ? s.isFreeSpin
+                          ? s.payout
+                          : s.payout - s.stake
+                        : s.isFreeSpin
+                          ? 0
+                          : s.stake
+                    }
+                    currency={s.currency}
+                    size={12}
+                  />
+                </span>
               </div>
             </div>
           );
