@@ -28,7 +28,7 @@ export default function PlayerSaldo() {
   function copyTransferText() {
     if (!saldo || saldo.saldoGold >= 0) return;
     navigator.clipboard.writeText(
-      `Transfer ${Math.abs(Math.round(saldo.saldoGold))} to Banter House`
+      `Transfer ${Math.abs(Math.round(saldo.saldoGold))} to Banter Homeowner`
     );
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
