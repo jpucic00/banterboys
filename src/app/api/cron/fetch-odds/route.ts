@@ -107,10 +107,12 @@ export async function GET(req: NextRequest) {
       });
 
       const events = await fetchOddsForSport(sportKey);
+      const seenApiIds = new Set<string>();
       let count = 0;
 
       for (const apiEvent of events) {
         const event = await matchOrCreateEvent(sport.id, apiEvent);
+        seenApiIds.add(apiEvent.id);
 
         // Prefer a bookmaker whose h2h market carries a 3-way outcome (Home/Draw/Away).
         // Soccer h2h is already 3-way everywhere. NHL h2h is 2-way for most bookmakers but
@@ -169,11 +171,96 @@ export async function GET(req: NextRequest) {
         let refreshed = 0;
         for (const apiEvent of allEvents) {
           await matchOrCreateEvent(sport.id, apiEvent);
+          seenApiIds.add(apiEvent.id);
           refreshed++;
         }
         if (refreshed > 0) results[`${sportKey}_events_refreshed`] = refreshed;
       } catch (error) {
         console.error(`[fetch-odds] /events pass failed for ${sportKey}:`, error);
+      }
+
+      // ── Dedup duplicate UPCOMING rows for the same fixture ────────────
+      // A row whose apiEventId is no longer returned by either /odds or
+      // /events lingers as a stale duplicate of a fresh row created under a
+      // new apiEventId. Group UPCOMING rows by (homeTeam, awayTeam) and merge
+      // any pair whose commenceTime sits within ±48h: prefer the row whose
+      // apiEventId is in the latest API response, migrate FK refs (snapshots,
+      // PvP bets, ticket selections), promote any ESPN id / logos that the
+      // kept row is missing, then delete the dropped row.
+      try {
+        const upcoming = await prisma.event.findMany({
+          where: { sportId: sport.id, status: "UPCOMING" },
+          orderBy: { commenceTime: "asc" },
+        });
+
+        const groups = new Map<string, typeof upcoming>();
+        for (const ev of upcoming) {
+          const key = `${ev.homeTeam.toLowerCase()}|${ev.awayTeam.toLowerCase()}`;
+          if (!groups.has(key)) groups.set(key, []);
+          groups.get(key)!.push(ev);
+        }
+
+        let merged = 0;
+        const dropped = new Set<string>();
+        for (const group of groups.values()) {
+          if (group.length < 2) continue;
+          for (let i = 0; i < group.length; i++) {
+            if (dropped.has(group[i].id)) continue;
+            for (let j = i + 1; j < group.length; j++) {
+              if (dropped.has(group[j].id)) continue;
+              const a = group[i];
+              const b = group[j];
+              const diff = Math.abs(a.commenceTime.getTime() - b.commenceTime.getTime());
+              if (diff > TEAM_DATE_MATCH_WINDOW_MS) continue;
+
+              const aInApi = seenApiIds.has(a.apiEventId);
+              const bInApi = seenApiIds.has(b.apiEventId);
+              let keep: typeof a;
+              let drop: typeof a;
+              if (aInApi && !bInApi) { keep = a; drop = b; }
+              else if (bInApi && !aInApi) { keep = b; drop = a; }
+              else if (a.commenceTime > b.commenceTime) { keep = a; drop = b; }
+              else { keep = b; drop = a; }
+
+              await prisma.$transaction(async (tx) => {
+                await tx.oddsSnapshot.updateMany({
+                  where: { eventId: drop.id },
+                  data: { eventId: keep.id },
+                });
+                await tx.pvPBet.updateMany({
+                  where: { eventId: drop.id },
+                  data: { eventId: keep.id },
+                });
+                await tx.ticketSelection.updateMany({
+                  where: { eventId: drop.id },
+                  data: { eventId: keep.id },
+                });
+                await tx.event.delete({ where: { id: drop.id } });
+
+                const updates: {
+                  espnEventId?: string;
+                  homeLogoUrl?: string;
+                  awayLogoUrl?: string;
+                } = {};
+                if (!keep.espnEventId && drop.espnEventId) updates.espnEventId = drop.espnEventId;
+                if (!keep.homeLogoUrl && drop.homeLogoUrl) updates.homeLogoUrl = drop.homeLogoUrl;
+                if (!keep.awayLogoUrl && drop.awayLogoUrl) updates.awayLogoUrl = drop.awayLogoUrl;
+                if (Object.keys(updates).length > 0) {
+                  await tx.event.update({ where: { id: keep.id }, data: updates });
+                }
+              });
+
+              dropped.add(drop.id);
+              merged++;
+              console.log(
+                `[fetch-odds] ${sportKey} merged duplicate ${drop.homeTeam} vs ${drop.awayTeam} (${drop.commenceTime.toISOString()} → ${keep.commenceTime.toISOString()})`,
+              );
+            }
+          }
+        }
+        if (merged > 0) results[`${sportKey}_dedup_merged`] = merged;
+      } catch (error) {
+        console.error(`[fetch-odds] dedup pass failed for ${sportKey}:`, error);
       }
 
       // ── ESPN ID mapping ────────────────────────────────────────────────
