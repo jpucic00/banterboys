@@ -45,14 +45,23 @@ function formatCurrency(
 async function sendWebhook(payload: object): Promise<void> {
   const url = process.env.DISCORD_WEBHOOK_URL;
   if (!url) return;
+  const tag =
+    (payload as { embeds?: { title?: string }[] })?.embeds?.[0]?.title ??
+    "(no title)";
   try {
-    await fetch(url, {
+    const res = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
-  } catch {
-    // Intentionally swallowed — Discord is non-critical
+    if (!res.ok) {
+      const body = await res.text().catch(() => "");
+      console.error(
+        `[discord-notify] ${tag} → HTTP ${res.status} ${body.slice(0, 500)}`
+      );
+    }
+  } catch (err) {
+    console.error(`[discord-notify] ${tag} → fetch failed`, err);
   }
 }
 
