@@ -27,8 +27,10 @@ export async function GET(req: NextRequest) {
 
   // Check every alias on the wheel — not just ones with bets — so a non-champion
   // death still settles the frame and the house keeps the unmatched stakes.
+  // Excluded players are skipped so an admin-removed character can't trigger
+  // settlement (their assigned spins were already refunded on exclusion).
   const wheelUsers = await prisma.user.findMany({
-    where: { alias: { not: null } },
+    where: { alias: { not: null }, excludedFromWheel: false },
     select: { alias: true },
   });
   const uniqueAliases = Array.from(

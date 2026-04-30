@@ -34,6 +34,7 @@ export async function eligibleWheelUsers(
   const users = await tx.user.findMany({
     where: {
       alias: { not: null },
+      excludedFromWheel: false,
       id: { not: excludeUserId },
     },
     select: { id: true, alias: true, name: true },

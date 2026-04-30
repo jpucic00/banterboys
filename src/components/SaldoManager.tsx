@@ -11,6 +11,7 @@ type UserSaldo = {
   image: string | null;
   saldoGold: number;
   saldoTibiaCoins: number;
+  excludedFromWheel: boolean;
 };
 
 export default function SaldoManager() {
@@ -21,6 +22,8 @@ export default function SaldoManager() {
   const [copied, setCopied] = useState<string | null>(null);
   const [notifyState, setNotifyState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [notifyMessage, setNotifyMessage] = useState<string | null>(null);
+  const [wheelMessages, setWheelMessages] = useState<Record<string, string>>({});
+  const [wheelPending, setWheelPending] = useState<Record<string, boolean>>({});
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -86,6 +89,58 @@ export default function SaldoManager() {
         },
       }));
     }
+  }
+
+  async function handleToggleWheelExclusion(user: UserSaldo) {
+    const willExclude = !user.excludedFromWheel;
+    if (
+      willExclude &&
+      !confirm(
+        `Remove ${user.alias ?? "this player"} from Wheel of Henricus? Any active-round spins assigned to them will be deleted and refunded to the spinners.`
+      )
+    ) {
+      return;
+    }
+    setWheelPending((prev) => ({ ...prev, [user.id]: true }));
+    try {
+      const res = await fetch("/api/admin/wheel-exclusion", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, excluded: willExclude }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setUsers((prev) =>
+          prev.map((u) =>
+            u.id === user.id ? { ...u, excludedFromWheel: data.excludedFromWheel } : u
+          )
+        );
+        const refunded = data.refundedSpinCount ?? 0;
+        const message = willExclude
+          ? refunded > 0
+            ? `Removed — refunded ${refunded} spin${refunded === 1 ? "" : "s"}`
+            : "Removed from wheel"
+          : "Re-added to wheel";
+        setWheelMessages((prev) => ({ ...prev, [user.id]: message }));
+      } else {
+        setWheelMessages((prev) => ({
+          ...prev,
+          [user.id]: data.error ?? `Failed (${res.status})`,
+        }));
+      }
+    } catch {
+      setWheelMessages((prev) => ({ ...prev, [user.id]: "Network error" }));
+    }
+    setWheelPending((prev) => ({ ...prev, [user.id]: false }));
+    setTimeout(
+      () =>
+        setWheelMessages((prev) => {
+          const next = { ...prev };
+          delete next[user.id];
+          return next;
+        }),
+      3000
+    );
   }
 
   async function handleSendDiscordSummary() {
@@ -174,27 +229,58 @@ export default function SaldoManager() {
           className="rounded-xl border border-border-light/30 p-4 space-y-3"
         >
           {/* User header */}
-          <div className="flex items-center gap-3">
-            {user.image ? (
-              <Image
-                src={user.image}
-                alt={user.alias ?? ""}
-                width={32}
-                height={32}
-                className="rounded-full"
-              />
-            ) : (
-              <div className="w-8 h-8 rounded-full bg-bg-tertiary" />
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                {user.image ? (
+                  <Image
+                    src={user.image}
+                    alt={user.alias ?? ""}
+                    width={32}
+                    height={32}
+                    className="rounded-full"
+                  />
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-bg-tertiary" />
+                )}
+                <span className="font-semibold text-text-primary truncate">
+                  {user.alias ?? "Unknown"}
+                </span>
+                {user.excludedFromWheel && (
+                  <span className="shrink-0 px-1.5 py-0.5 text-[10px] uppercase tracking-wide rounded bg-loss/10 border border-loss/30 text-loss">
+                    Off wheel
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2 w-full justify-end sm:w-auto sm:ml-auto">
+                <button
+                  onClick={() => handleToggleWheelExclusion(user)}
+                  disabled={wheelPending[user.id]}
+                  className={`px-2 py-1 text-xs rounded-lg border transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+                    user.excludedFromWheel
+                      ? "bg-win/10 border-win/30 text-win hover:bg-win/20"
+                      : "bg-bg-tertiary border-loss/30 text-loss hover:bg-loss/10"
+                  }`}
+                >
+                  {wheelPending[user.id]
+                    ? "..."
+                    : user.excludedFromWheel
+                      ? "Re-add to Wheel"
+                      : "Remove from Wheel"}
+                </button>
+                <Link
+                  href={`/admin/users/${user.id}`}
+                  className="px-2 py-1 text-xs rounded-lg bg-bg-tertiary border border-border-light/30 text-text-secondary hover:text-text-primary transition-colors"
+                >
+                  View profile
+                </Link>
+              </div>
+            </div>
+            {wheelMessages[user.id] && (
+              <div className="text-xs text-text-muted">
+                {wheelMessages[user.id]}
+              </div>
             )}
-            <span className="font-semibold text-text-primary">
-              {user.alias ?? "Unknown"}
-            </span>
-            <Link
-              href={`/admin/users/${user.id}`}
-              className="ml-auto px-2 py-1 text-xs rounded-lg bg-bg-tertiary border border-border-light/30 text-text-secondary hover:text-text-primary transition-colors"
-            >
-              View profile
-            </Link>
           </div>
 
           {/* Gold saldo row */}

@@ -22,7 +22,7 @@ export async function GET() {
   });
 
   const eligibleUsers = await prisma.user.findMany({
-    where: { alias: { not: null } },
+    where: { alias: { not: null }, excludedFromWheel: false },
     select: { id: true, alias: true, name: true, image: true },
     orderBy: { alias: "asc" },
   });

@@ -113,6 +113,11 @@ model User {
   activeGambleAmount Float @default(0)
   activeGambleRounds Int   @default(0)
 
+  // Soft-exclude from Wheel of Henricus pool. Keeps alias intact for other
+  // features (Discord mentions, leaderboards) while removing them from spins
+  // and the death-check cron.
+  excludedFromWheel Boolean @default(false)
+
   accounts                 Account[]
   sessions                 Session[]
   createdBets              PvPBet[]          @relation("BetCreator")

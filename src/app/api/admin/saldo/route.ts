@@ -18,6 +18,7 @@ export async function GET() {
       image: true,
       saldoGold: true,
       saldoTibiaCoins: true,
+      excludedFromWheel: true,
     },
     orderBy: { alias: "asc" },
   });
