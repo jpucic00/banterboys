@@ -1212,16 +1212,22 @@ function AddictedOverlay() {
       aria-labelledby="addicted-title"
       style={{
         position: "fixed",
-        top: "50%",
-        left: "50%",
+        inset: 0,
         pointerEvents: "none",
         zIndex: 9999,
-        whiteSpace: "nowrap",
-        animation:
-          "slots-addicted-pop 1100ms cubic-bezier(0.34, 1.56, 0.64, 1) both",
+        display: "flex",
+        justifyContent: "center",
+        alignItems: "center",
       }}
     >
-      <div className="flex flex-col items-center gap-6">
+      <div
+        style={{
+          position: "relative",
+          whiteSpace: "nowrap",
+          animation:
+            "slots-addicted-pop 1100ms cubic-bezier(0.34, 1.56, 0.64, 1) both",
+        }}
+      >
         <div
           id="addicted-title"
           className="font-black uppercase"
@@ -1236,22 +1242,31 @@ function AddictedOverlay() {
         >
           ADDICTED
         </div>
-        <button
-          type="button"
-          onClick={() => setDismissed(true)}
-          className="px-6 py-3 rounded-md font-bold uppercase tracking-wide text-sm transition-transform hover:scale-105 active:scale-95"
+        <div
           style={{
-            background: "linear-gradient(to bottom, #7C3AED, #5B21B6)",
-            color: "#fff",
-            border: "2px solid #A855F7",
-            boxShadow:
-              "0 0 18px rgba(168, 85, 247, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.2)",
-            pointerEvents: "auto",
-            cursor: "pointer",
+            position: "absolute",
+            top: "calc(100% + 20px)",
+            left: "50%",
+            transform: "translateX(-50%)",
           }}
         >
-          Ok, fuck you
-        </button>
+          <button
+            type="button"
+            onClick={() => setDismissed(true)}
+            className="px-6 py-3 rounded-md font-bold uppercase tracking-wide text-sm transition-transform hover:scale-105 active:scale-95"
+            style={{
+              background: "linear-gradient(to bottom, #7C3AED, #5B21B6)",
+              color: "#fff",
+              border: "2px solid #A855F7",
+              boxShadow:
+                "0 0 18px rgba(168, 85, 247, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.2)",
+              pointerEvents: "auto",
+              cursor: "pointer",
+            }}
+          >
+            Ok, fuck you
+          </button>
+        </div>
       </div>
     </div>
   );
