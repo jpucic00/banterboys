@@ -15,6 +15,7 @@ import {
   MAX_SLOT_DEBT,
   GAMBLE_CARDS,
   MAX_GAMBLE_ROUNDS,
+  MAX_GAMBLE_AMOUNT,
 } from "@/lib/slots";
 
 type SpinUser = {
@@ -254,7 +255,12 @@ export default function SlotsMachine({
 
   async function handleGamble(pickIndex: number) {
     if (gambling || spinning) return;
-    if (gambleAmount <= 0 || gambleRounds >= MAX_GAMBLE_ROUNDS) return;
+    if (
+      gambleAmount <= 0 ||
+      gambleRounds >= MAX_GAMBLE_ROUNDS ||
+      gambleAmount > MAX_GAMBLE_AMOUNT
+    )
+      return;
     setError(null);
     setGambling(true);
 
@@ -897,6 +903,7 @@ function GamblePanel({
   disabled?: boolean;
 }) {
   const atMaxRounds = rounds >= MAX_GAMBLE_ROUNDS;
+  const atMaxAmount = amount > MAX_GAMBLE_AMOUNT;
   const nextAmount = amount * 2;
 
   return (
@@ -932,7 +939,9 @@ function GamblePanel({
                   : "Wrong card — you lost it."
                 : atMaxRounds
                   ? "Max rounds reached. Collect your winnings!"
-                  : "Pick the Ferumbras to double your winnings."}
+                  : atMaxAmount
+                    ? `Max gamble amount (${MAX_GAMBLE_AMOUNT} TC). Collect your winnings!`
+                    : "Pick the Ferumbras to double your winnings."}
           </div>
         </div>
         {!disabled && (
@@ -947,7 +956,7 @@ function GamblePanel({
                   <CoinAmount amount={amount} currency="TIBIA_COINS" size={12} />
                 </span>
               </span>
-              {!atMaxRounds && (
+              {!atMaxRounds && !atMaxAmount && (
                 <span className="text-text-muted">
                   win{" "}
                   <span style={{ color: "#00c853" }}>
@@ -971,7 +980,11 @@ function GamblePanel({
           const isPicked = reveal?.pickIndex === i;
           const isWinCard = reveal?.winIndex === i;
           const clickable =
-            !disabled && !gambling && !isRevealed && !atMaxRounds;
+            !disabled &&
+            !gambling &&
+            !isRevealed &&
+            !atMaxRounds &&
+            !atMaxAmount;
 
           return (
             <button

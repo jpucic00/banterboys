@@ -4,6 +4,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import {
   GAMBLE_CARDS,
+  MAX_GAMBLE_AMOUNT,
   MAX_GAMBLE_ROUNDS,
   MAX_SLOT_DEBT,
 } from "@/lib/slots";
@@ -75,6 +76,9 @@ export async function POST(req: NextRequest) {
       if (user.activeGambleAmount <= 0) throw new Error("NO_ACTIVE_GAMBLE");
       if (user.activeGambleRounds >= MAX_GAMBLE_ROUNDS) {
         throw new Error("MAX_ROUNDS");
+      }
+      if (user.activeGambleAmount > MAX_GAMBLE_AMOUNT) {
+        throw new Error("GAMBLE_CAP");
       }
 
       const amount = user.activeGambleAmount;
@@ -157,6 +161,14 @@ export async function POST(req: NextRequest) {
     if (msg === "MAX_ROUNDS") {
       return NextResponse.json(
         { error: `Max gamble rounds reached (${MAX_GAMBLE_ROUNDS}). Collect your winnings.` },
+        { status: 400 }
+      );
+    }
+    if (msg === "GAMBLE_CAP") {
+      return NextResponse.json(
+        {
+          error: `Max gamble amount reached (${MAX_GAMBLE_AMOUNT} TC). Collect your winnings.`,
+        },
         { status: 400 }
       );
     }

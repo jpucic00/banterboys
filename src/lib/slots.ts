@@ -244,3 +244,10 @@ export const MAX_SLOT_DEBT = 500;
 // face-down cards hides the Ferumbras. Right = winnings double; wrong = lose it.
 export const GAMBLE_CARDS = 2;
 export const MAX_GAMBLE_ROUNDS = 5;
+
+// Cap on the at-risk amount in any single gamble round. A spin can pay at
+// most stake × 220 = 2,200 TC at max stake, so the very first gamble round
+// after a max-stake jackpot still works (amount === MAX_GAMBLE_AMOUNT). One
+// winning round above that pushes activeGambleAmount over the cap and forces
+// the player to collect, which bounds max session winnings at 4,400 TC.
+export const MAX_GAMBLE_AMOUNT = 2_200;
