@@ -60,7 +60,7 @@ export const SPRITE_PATH: Record<SlotSymbol, string> = {
   dark_torturer: "/tibia/dark_torturer.webp",
   demon: "/tibia/demon.webp",
   ferumbras: "/tibia/ferumbras.webp",
-  joker: "/tibia/jester_doll.webp",
+  joker: "/tibia/foulsy.png",
 };
 
 export const SYMBOL_LABEL: Record<SlotSymbol, string> = {
@@ -70,7 +70,7 @@ export const SYMBOL_LABEL: Record<SlotSymbol, string> = {
   dark_torturer: "Dark Torturer",
   demon: "Demon",
   ferumbras: "Ferumbras",
-  joker: "Jester Doll",
+  joker: "Foulsy",
 };
 
 // Build a flat weight array once; pick uniformly from it with crypto.randomInt.

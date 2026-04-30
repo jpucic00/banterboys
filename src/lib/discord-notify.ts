@@ -675,7 +675,7 @@ const SLOT_SYMBOL_LABELS: Record<string, string> = {
   dark_torturer: "Dark Torturer",
   demon: "Demon",
   ferumbras: "Ferumbras",
-  joker: "Jester Doll",
+  joker: "Foulsy",
 };
 
 export async function notifySlotWin(spin: {
@@ -704,15 +704,15 @@ export async function notifySlotWin(spin: {
     )}`;
     color = COLORS.orange;
   } else if (isTripleJester) {
-    title = `🃏 Triple Jester — ${player} aligned three Jesters!`;
-    description = `Three Jester Dolls in a row — pays the Demon Triple. **${player}** hit ×${spin.multiplier} on the Tibia Slots.${siteLink(
+    title = `🃏 Triple Foulsy — ${player} aligned three Foulsies!`;
+    description = `Three Foulsies in a row — pays the Demon Triple. **${player}** hit ×${spin.multiplier} on the Tibia Slots.${siteLink(
       "view"
     )}`;
     color = COLORS.orange;
   } else {
     title = `🎰 Big Slot Win — ${player}`;
     description = `**${player}** hit a ×${spin.multiplier} multiplier${
-      spin.wildUsed ? " (Jester wild)" : ""
+      spin.wildUsed ? " (Foulsy wild)" : ""
     } on the Tibia Slots.${siteLink("view")}`;
     color = COLORS.green;
   }

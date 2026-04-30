@@ -416,7 +416,7 @@ export default function SlotsMachine({
       <div className="flex items-center justify-between gap-2 flex-wrap">
         <div>
           <p className="text-text-muted text-xs">
-            Match 3 symbols for big payouts. The Jester is wild — substitutes for any symbol except to complete Triple Ferumbras.
+            Match 3 symbols for big payouts. Foulsy is wild — substitutes for any symbol except to complete Triple Ferumbras.
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -506,9 +506,12 @@ export default function SlotsMachine({
               }}
             >
               <span>🃏</span>
-              <span>Triple Jester × {lastResult?.multiplier}</span>
+              <span>Triple Foulsy × {lastResult?.multiplier}</span>
               <span>🃏</span>
             </div>
+          )}
+          {isTripleJester && lastResult?.spinId && (
+            <AddictedOverlay key={`addicted-${lastResult.spinId}`} />
           )}
           {isBigWin && !isJackpot && !isTripleJester && (
             <div
@@ -1146,7 +1149,7 @@ function Paytable() {
           className="text-[10px] uppercase tracking-wide mb-2 font-bold"
           style={{ color: "#A855F7" }}
         >
-          🃏 Jester (Wild)
+          🃏 Foulsy (Wild)
         </div>
         <div className="space-y-1.5">
           <div className="flex items-center justify-between gap-2 text-sm">
@@ -1161,7 +1164,7 @@ function Paytable() {
                 />
               </div>
               <span className="text-text-secondary text-xs ml-1">
-                1–2 Jesters substitute for any symbol to make the best paying combo
+                1–2 Foulsies substitute for any symbol to make the best paying combo
               </span>
             </div>
           </div>
@@ -1180,7 +1183,7 @@ function Paytable() {
                 ))}
               </div>
               <span className="text-text-secondary text-xs ml-1 truncate">
-                Triple Jester
+                Triple Foulsy
               </span>
             </div>
             <span
@@ -1191,10 +1194,64 @@ function Paytable() {
             </span>
           </div>
           <div className="text-[10px] text-text-muted italic pt-1">
-            Jesters cannot complete the 220× Triple Ferumbras jackpot — that's
+            Foulsy cannot complete the 220× Triple Ferumbras jackpot — that's
             reserved for three actual ferumbras.
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function AddictedOverlay() {
+  const [dismissed, setDismissed] = useState(false);
+  if (dismissed) return null;
+  return (
+    <div
+      role="alertdialog"
+      aria-labelledby="addicted-title"
+      style={{
+        position: "fixed",
+        top: "50%",
+        left: "50%",
+        pointerEvents: "none",
+        zIndex: 9999,
+        whiteSpace: "nowrap",
+        animation:
+          "slots-addicted-pop 1100ms cubic-bezier(0.34, 1.56, 0.64, 1) both",
+      }}
+    >
+      <div className="flex flex-col items-center gap-6">
+        <div
+          id="addicted-title"
+          className="font-black uppercase"
+          style={{
+            fontSize: "clamp(64px, 16vw, 220px)",
+            letterSpacing: "0.05em",
+            color: "#fff",
+            WebkitTextStroke: "3px #6B21A8",
+            textShadow:
+              "0 0 20px rgba(168, 85, 247, 0.95), 0 0 50px rgba(168, 85, 247, 0.75), 0 0 90px rgba(239, 68, 68, 0.55)",
+          }}
+        >
+          ADDICTED
+        </div>
+        <button
+          type="button"
+          onClick={() => setDismissed(true)}
+          className="px-6 py-3 rounded-md font-bold uppercase tracking-wide text-sm transition-transform hover:scale-105 active:scale-95"
+          style={{
+            background: "linear-gradient(to bottom, #7C3AED, #5B21B6)",
+            color: "#fff",
+            border: "2px solid #A855F7",
+            boxShadow:
+              "0 0 18px rgba(168, 85, 247, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.2)",
+            pointerEvents: "auto",
+            cursor: "pointer",
+          }}
+        >
+          Ok, fuck you
+        </button>
       </div>
     </div>
   );
@@ -1425,7 +1482,7 @@ function RecentSpins({ spins }: { spins: SpinHistoryItem[] }) {
                       tier === "jackpot"
                         ? "Jackpot!"
                         : tier === "tripleJester"
-                          ? "Triple Jester"
+                          ? "Triple Foulsy"
                           : tier === "big"
                             ? "Big win"
                             : "Win"
