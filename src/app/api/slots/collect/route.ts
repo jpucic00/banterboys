@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
+import { SLOTS_DISABLED } from "@/lib/slots";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,8 @@ export const dynamic = "force-dynamic";
  * can spin again without the gamble UI showing up.
  */
 export async function POST() {
+  if (SLOTS_DISABLED) return NextResponse.json({ error: "Not Found" }, { status: 404 });
+
   const session = await auth();
   if (!session?.user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });

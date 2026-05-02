@@ -7,6 +7,7 @@ import {
   MAX_GAMBLE_AMOUNT,
   MAX_GAMBLE_ROUNDS,
   MAX_SLOT_DEBT,
+  SLOTS_DISABLED,
 } from "@/lib/slots";
 import { checkSlotThrottle } from "@/lib/slots-rate-limit";
 import { isBettingDisabled, bettingDisabledResponse } from "@/lib/betting-status";
@@ -23,6 +24,7 @@ export const dynamic = "force-dynamic";
  * was already credited at spin time, so saldo is decremented).
  */
 export async function POST(req: NextRequest) {
+  if (SLOTS_DISABLED) return NextResponse.json({ error: "Not Found" }, { status: 404 });
   if (isBettingDisabled()) return bettingDisabledResponse();
 
   const session = await auth();

@@ -1,5 +1,9 @@
 import { randomInt } from "node:crypto";
 
+// Feature kill switch: when true, the slots route and all /api/slots/*
+// endpoints respond 404. Flip to false to re-enable.
+export const SLOTS_DISABLED = true;
+
 export type SlotSymbol =
   | "snake"
   | "dragon_lord"

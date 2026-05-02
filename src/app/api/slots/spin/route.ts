@@ -8,6 +8,7 @@ import {
   STAKE_LIMITS,
   DISCORD_NOTIFY_MULTIPLIER,
   MAX_SLOT_DEBT,
+  SLOTS_DISABLED,
 } from "@/lib/slots";
 import { checkSlotThrottle } from "@/lib/slots-rate-limit";
 import { notifySlotWin } from "@/lib/discord-notify";
@@ -16,6 +17,7 @@ import { isBettingDisabled, bettingDisabledResponse } from "@/lib/betting-status
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
+  if (SLOTS_DISABLED) return NextResponse.json({ error: "Not Found" }, { status: 404 });
   if (isBettingDisabled()) return bettingDisabledResponse();
 
   const session = await auth();

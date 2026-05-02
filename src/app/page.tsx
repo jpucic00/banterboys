@@ -9,6 +9,7 @@ import { auth } from "@/lib/auth";
 import { isAdminEmail } from "@/lib/admin";
 import { Suspense } from "react";
 import { PvPBetStatus, TicketStatus } from "@prisma/client";
+import { SLOTS_DISABLED } from "@/lib/slots";
 
 export const dynamic = "force-dynamic";
 
@@ -126,34 +127,36 @@ export default async function Home({
           </div>
         </Link>
 
-        <Link
-          href="/slots"
-          className="group relative overflow-hidden rounded-md p-5 transition-all duration-200 hover:bg-surface-hover"
-          style={{ background: "#141414", border: "1px solid #252525" }}
-        >
-          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200" style={{ borderLeft: "2px solid #A855F7", borderRadius: "inherit" }} />
-          <Image
-            src="/tibia/dragon.webp"
-            alt=""
-            width={72}
-            height={72}
-            className="absolute right-4 bottom-4 opacity-60 group-hover:opacity-85 transition-opacity pointer-events-none"
-            style={{ imageRendering: "pixelated" }}
-          />
-          <div className="relative z-10 pr-16">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#A855F7" }} />
-              <h2 className="text-base font-bold text-white uppercase tracking-wide">Slots</h2>
+        {!SLOTS_DISABLED && (
+          <Link
+            href="/slots"
+            className="group relative overflow-hidden rounded-md p-5 transition-all duration-200 hover:bg-surface-hover"
+            style={{ background: "#141414", border: "1px solid #252525" }}
+          >
+            <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-200" style={{ borderLeft: "2px solid #A855F7", borderRadius: "inherit" }} />
+            <Image
+              src="/tibia/dragon.webp"
+              alt=""
+              width={72}
+              height={72}
+              className="absolute right-4 bottom-4 opacity-60 group-hover:opacity-85 transition-opacity pointer-events-none"
+              style={{ imageRendering: "pixelated" }}
+            />
+            <div className="relative z-10 pr-16">
+              <div className="flex items-center gap-2 mb-2">
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: "#A855F7" }} />
+                <h2 className="text-base font-bold text-white uppercase tracking-wide">Slots</h2>
+              </div>
+              <p className="text-text-muted text-sm leading-relaxed">
+                Spin the Tibia reels. Match monsters for big multipliers — or watch your coins vanish.
+              </p>
+              <div className="flex items-center gap-2 mt-3">
+                <Image src="/tibia/tibia_coin.webp" alt="" width={13} height={13} style={{ imageRendering: "pixelated" }} />
+                <span className="text-xs text-text-muted">Tibia Coins</span>
+              </div>
             </div>
-            <p className="text-text-muted text-sm leading-relaxed">
-              Spin the Tibia reels. Match monsters for big multipliers — or watch your coins vanish.
-            </p>
-            <div className="flex items-center gap-2 mt-3">
-              <Image src="/tibia/tibia_coin.webp" alt="" width={13} height={13} style={{ imageRendering: "pixelated" }} />
-              <span className="text-xs text-text-muted">Tibia Coins</span>
-            </div>
-          </div>
-        </Link>
+          </Link>
+        )}
       </div>
 
       {/* History feed */}

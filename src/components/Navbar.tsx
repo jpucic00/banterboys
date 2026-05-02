@@ -40,7 +40,8 @@ export default function Navbar() {
           <NavLink href="/" active={pathname === "/"}>Overview</NavLink>
           <NavLink href="/bets" active={pathname === "/bets"}>PvP Bets</NavLink>
           <NavLink href="/tickets" active={pathname === "/tickets"}>Bet Slips</NavLink>
-          <NavLink href="/slots" active={pathname === "/slots"}>Slots</NavLink>
+          {/* Slots disabled — see SLOTS_DISABLED in src/lib/slots.ts */}
+          {/* <NavLink href="/slots" active={pathname === "/slots"}>Slots</NavLink> */}
           <NavLink
             href="/wheel-of-henricus"
             active={pathname.startsWith("/wheel-of-henricus")}
@@ -125,7 +126,8 @@ export default function Navbar() {
               <MobileLink href="/" active={pathname === "/"} onClick={() => setMenuOpen(false)}>Overview</MobileLink>
               <MobileLink href="/bets" active={pathname === "/bets"} onClick={() => setMenuOpen(false)}>PvP Bets</MobileLink>
               <MobileLink href="/tickets" active={pathname === "/tickets"} onClick={() => setMenuOpen(false)}>Bet Slips</MobileLink>
-              <MobileLink href="/slots" active={pathname === "/slots"} onClick={() => setMenuOpen(false)}>Slots</MobileLink>
+              {/* Slots disabled — see SLOTS_DISABLED in src/lib/slots.ts */}
+              {/* <MobileLink href="/slots" active={pathname === "/slots"} onClick={() => setMenuOpen(false)}>Slots</MobileLink> */}
               <MobileLink
                 href="/wheel-of-henricus"
                 active={pathname.startsWith("/wheel-of-henricus")}
