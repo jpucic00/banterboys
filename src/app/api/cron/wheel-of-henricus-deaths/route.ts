@@ -25,6 +25,19 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ ok: true, skipped: "empty-frame" });
   }
 
+  // Use the earliest spin's createdAt as the death cutoff, not frame.createdAt.
+  // The frame is created at the moment the previous one settles — so a death
+  // that happens before anyone spins on the new frame would otherwise get
+  // wrongly attributed to the first late-arriving spin (the user would lose
+  // to a death that happened before they bet). Falling back to frame.createdAt
+  // is defensive — the empty-frame skip above guarantees a spin exists.
+  const earliestSpin = await prisma.henricusSpin.findFirst({
+    where: { frameId: frame.id },
+    orderBy: { createdAt: "asc" },
+    select: { createdAt: true },
+  });
+  const deathCutoff = earliestSpin?.createdAt ?? frame.createdAt;
+
   // Check every alias on the wheel — not just ones with bets — so a non-champion
   // death still settles the frame and the house keeps the unmatched stakes.
   // Excluded players are skipped so an admin-removed character can't trigger
@@ -46,7 +59,7 @@ export async function GET(req: NextRequest) {
     const results = await Promise.all(
       batch.map(async (alias) => {
         const deaths = await fetchCharacterDeaths(alias);
-        const fresh = deaths.filter((d) => d.time > frame.createdAt);
+        const fresh = deaths.filter((d) => d.time > deathCutoff);
         if (fresh.length === 0) return null;
         // Pick the EARLIEST fresh death for this alias (the one that "ended" the frame).
         const earliest = fresh.reduce((a, b) => (a.time <= b.time ? a : b));
