@@ -1,7 +1,14 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 
-export const SPIN_STAKE = 25;
-export const SPIN_PAYOUT = 500;
+function envNonNegativeInt(key: string, fallback: number): number {
+  const raw = process.env[key];
+  if (raw === undefined || raw === "") return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) && n >= 0 ? Math.floor(n) : fallback;
+}
+
+export const SPIN_STAKE = envNonNegativeInt("HENRICUS_SPIN_STAKE", 25);
+export const SPIN_PAYOUT = envNonNegativeInt("HENRICUS_SPIN_PAYOUT", 500);
 export const MAX_SPINS_PER_FRAME = 3;
 
 type Tx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"> | Prisma.TransactionClient;

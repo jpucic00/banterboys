@@ -43,6 +43,7 @@ type UserState = {
 };
 
 type InitialState = {
+  config: { spinStake: number; spinPayout: number };
   frame: { id: string; totalSpinCount: number; createdAt: string };
   spins: Spin[];
   eligibleUsers: EligibleUser[];
@@ -60,8 +61,6 @@ type SpinResponse = {
   frameId: string;
 };
 
-const SPIN_STAKE = 25;
-const SPIN_PAYOUT = 500;
 const MAX_SPINS_PER_FRAME = 3;
 const ANIMATION_MS = 4500;
 
@@ -93,6 +92,8 @@ export default function HenricusWheelClient({
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
   const lastFrameId = useRef(initialState.frame.id);
+  const SPIN_STAKE = state.config.spinStake;
+  const SPIN_PAYOUT = state.config.spinPayout;
 
   // Visible wheel pool: all aliased guildmates (excluding self if logged in).
   // Stable order by alias so the wheel layout doesn't jitter between renders.
@@ -109,6 +110,7 @@ export default function HenricusWheelClient({
         if (!res.ok) return;
         const fresh = await res.json();
         setState((prev) => ({
+          config: prev.config,
           frame: fresh.frame,
           spins: fresh.spins,
           eligibleUsers: fresh.eligibleUsers,
@@ -214,7 +216,7 @@ export default function HenricusWheelClient({
       setError("Network error. Try again.");
       setSpinning(false);
     }
-  }, [spinning, state.user, wheelEntries, rotation]);
+  }, [spinning, state.user, wheelEntries, rotation, SPIN_STAKE]);
 
   const balanceStr = state.user.balance.toLocaleString();
   const debtBlocked = state.user.balance - SPIN_STAKE < -500;
@@ -456,6 +458,8 @@ export default function HenricusWheelClient({
               ? "ROUND LOCKED — WAIT FOR DEATH"
               : debtBlocked
               ? "DEBT LIMIT REACHED"
+              : SPIN_STAKE === 0
+              ? "FREE SPIN"
               : `SPIN — ${SPIN_STAKE} TC`}
           </button>
 

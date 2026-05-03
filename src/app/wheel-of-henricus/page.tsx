@@ -1,7 +1,12 @@
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isAdminEmail } from "@/lib/admin";
-import { MAX_SPINS_PER_FRAME, getOrCreateActiveFrame } from "@/lib/wheel-of-henricus";
+import {
+  MAX_SPINS_PER_FRAME,
+  SPIN_STAKE,
+  SPIN_PAYOUT,
+  getOrCreateActiveFrame,
+} from "@/lib/wheel-of-henricus";
 import HenricusWheelClient from "./HenricusWheelClient";
 
 export const dynamic = "force-dynamic";
@@ -82,6 +87,10 @@ export default async function WheelOfHenricusPage() {
   }
 
   const initialState = {
+    config: {
+      spinStake: SPIN_STAKE,
+      spinPayout: SPIN_PAYOUT,
+    },
     frame: {
       id: frame.id,
       totalSpinCount: frame.totalSpinCount,
