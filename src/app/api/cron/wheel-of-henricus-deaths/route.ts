@@ -44,11 +44,19 @@ export async function GET(req: NextRequest) {
   // settlement (their assigned spins were already refunded on exclusion).
   const wheelUsers = await prisma.user.findMany({
     where: { alias: { not: null }, excludedFromWheel: false },
-    select: { alias: true },
+    select: { alias: true, aliasSetAt: true },
   });
-  const uniqueAliases = Array.from(
-    new Set(wheelUsers.map((u) => u.alias as string))
-  );
+  // Per-user cutoff: a player who joined the wheel mid-round shouldn't be
+  // settled by a death that happened before they joined. Take the later of
+  // the frame-level deathCutoff and the user's aliasSetAt.
+  const aliasCutoffs = new Map<string, Date>();
+  for (const u of wheelUsers) {
+    const alias = u.alias as string;
+    const userCutoff =
+      u.aliasSetAt && u.aliasSetAt > deathCutoff ? u.aliasSetAt : deathCutoff;
+    aliasCutoffs.set(alias, userCutoff);
+  }
+  const uniqueAliases = Array.from(aliasCutoffs.keys());
 
   // Fetch with bounded concurrency (5 at a time) so we don't blast TibiaData.
   type Match = { alias: string; time: Date; level: number; reason: string };
@@ -59,7 +67,8 @@ export async function GET(req: NextRequest) {
     const results = await Promise.all(
       batch.map(async (alias) => {
         const deaths = await fetchCharacterDeaths(alias);
-        const fresh = deaths.filter((d) => d.time > deathCutoff);
+        const cutoff = aliasCutoffs.get(alias) ?? deathCutoff;
+        const fresh = deaths.filter((d) => d.time > cutoff);
         if (fresh.length === 0) return null;
         // Pick the EARLIEST fresh death for this alias (the one that "ended" the frame).
         const earliest = fresh.reduce((a, b) => (a.time <= b.time ? a : b));

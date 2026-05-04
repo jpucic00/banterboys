@@ -16,9 +16,18 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    const current = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { alias: true },
+    });
+    if (current?.alias === alias) {
+      return NextResponse.json({ ok: true });
+    }
+    // Stamp aliasSetAt on every real change so the wheel death cron can ignore
+    // deaths that pre-date this user joining (or rejoining under a new name).
     await prisma.user.update({
       where: { id: session.user.id },
-      data: { alias },
+      data: { alias, aliasSetAt: new Date() },
     });
     return NextResponse.json({ ok: true });
   } catch {

@@ -118,6 +118,12 @@ model User {
   // and the death-check cron.
   excludedFromWheel Boolean @default(false)
 
+  // Set whenever the alias is (re)assigned. The Wheel of Henricus death cron
+  // uses max(frame deathCutoff, aliasSetAt) per user so a player who joins
+  // mid-round can't settle the frame with a death that happened before they
+  // were on the wheel. Nullable for users who have never set an alias.
+  aliasSetAt DateTime?
+
   accounts                 Account[]
   sessions                 Session[]
   createdBets              PvPBet[]          @relation("BetCreator")
