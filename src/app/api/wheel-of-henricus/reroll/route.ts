@@ -4,18 +4,16 @@ import { prisma } from "@/lib/db";
 import { isBettingDisabled, bettingDisabledResponse } from "@/lib/betting-status";
 import { MAX_DEBT } from "@/lib/bet-limits";
 import {
-  SPIN_STAKE,
-  MAX_SPINS_PER_FRAME,
+  rerollCost,
   pickRandomAssignee,
   getOrCreateActiveFrame,
   eligibleWheelUsers,
-  rerollCost,
 } from "@/lib/wheel-of-henricus";
 import { notifyHenricusChampionSelected } from "@/lib/discord-notify";
 
 export const dynamic = "force-dynamic";
 
-class SpinError extends Error {
+class RerollError extends Error {
   status: number;
   constructor(message: string, status = 400) {
     super(message);
@@ -38,71 +36,74 @@ export async function POST() {
         where: { id: userId },
         select: { saldoTibiaCoins: true },
       });
-      if (!user) throw new SpinError("User not found", 404);
-
-      if (user.saldoTibiaCoins - SPIN_STAKE < -MAX_DEBT.TIBIA_COINS) {
-        throw new SpinError(
-          `Debt limit reached (${MAX_DEBT.TIBIA_COINS} TC). Pay out your debt to keep spinning.`
-        );
-      }
+      if (!user) throw new RerollError("User not found", 404);
 
       const frame = await getOrCreateActiveFrame(tx);
 
-      const existingSpins = await tx.henricusSpin.count({
+      const existingSpin = await tx.henricusSpin.findFirst({
         where: { frameId: frame.id, spinnerUserId: userId },
+        select: {
+          id: true,
+          rerollCount: true,
+          assignedUserId: true,
+          assignedAlias: true,
+          stake: true,
+        },
       });
-      if (existingSpins >= MAX_SPINS_PER_FRAME) {
-        throw new SpinError(
-          `You've used all ${MAX_SPINS_PER_FRAME} spins for this round. Wait for the wheel to settle.`
+      if (!existingSpin) {
+        throw new RerollError("You haven't spun yet this round. Spin first.");
+      }
+
+      const cost = rerollCost(existingSpin.rerollCount);
+
+      if (user.saldoTibiaCoins - cost < -MAX_DEBT.TIBIA_COINS) {
+        throw new RerollError(
+          `Debt limit reached (${MAX_DEBT.TIBIA_COINS} TC). Pay out your debt to keep rerolling.`
         );
       }
 
       const pool = await eligibleWheelUsers(tx, userId);
-      if (pool.length === 0) {
-        throw new SpinError(
-          "No guildmates with aliases set yet. The wheel needs more participants."
+      const filteredPool = pool.filter(
+        (u) => u.id !== existingSpin.assignedUserId
+      );
+      if (filteredPool.length === 0) {
+        throw new RerollError(
+          "No other guildmates available to reroll to."
         );
       }
 
-      const assignee = pickRandomAssignee(pool);
+      const assignee = pickRandomAssignee(filteredPool);
 
-      const spin = await tx.henricusSpin.create({
+      const newRerollCount = existingSpin.rerollCount + 1;
+
+      await tx.henricusSpin.update({
+        where: { id: existingSpin.id },
         data: {
-          frameId: frame.id,
-          spinnerUserId: userId,
           assignedUserId: assignee.id,
           assignedAlias: assignee.alias,
-          stake: SPIN_STAKE,
+          rerollCount: newRerollCount,
+          stake: existingSpin.stake + cost,
         },
-        select: { id: true, createdAt: true },
       });
 
       const updatedUser = await tx.user.update({
         where: { id: userId },
-        data: { saldoTibiaCoins: { decrement: SPIN_STAKE } },
+        data: { saldoTibiaCoins: { decrement: cost } },
         select: { saldoTibiaCoins: true },
       });
 
-      await tx.henricusFrame.update({
-        where: { id: frame.id },
-        data: { totalSpinCount: { increment: 1 } },
-      });
-
       return {
-        spinId: spin.id,
-        createdAt: spin.createdAt,
+        spinId: existingSpin.id,
         assignedUserId: assignee.id,
         assignedAlias: assignee.alias,
         assignedDisplayName: assignee.name ?? assignee.alias,
         newBalance: updatedUser.saldoTibiaCoins,
-        spinsRemaining: MAX_SPINS_PER_FRAME - existingSpins - 1,
-        rerollCount: 0,
-        nextRerollCost: rerollCost(0),
+        rerollCount: newRerollCount,
+        nextRerollCost: rerollCost(newRerollCount),
         frameId: frame.id,
       };
     });
 
-    // Fire-and-forget Discord notification — never blocks the response.
     (async () => {
       const [spinner, champion] = await Promise.all([
         prisma.user.findUnique({
@@ -131,7 +132,8 @@ export async function POST() {
       await notifyHenricusChampionSelected({
         spinnerDisplayName: spinner?.alias ?? spinner?.name ?? "Unknown",
         spinnerDiscordId: spinner?.accounts[0]?.providerAccountId ?? null,
-        championDisplayName: champion?.alias ?? champion?.name ?? result.assignedAlias,
+        championDisplayName:
+          champion?.alias ?? champion?.name ?? result.assignedAlias,
         championDiscordId: champion?.accounts[0]?.providerAccountId ?? null,
         championAlias: result.assignedAlias,
       });
@@ -139,16 +141,16 @@ export async function POST() {
 
     return NextResponse.json(result);
   } catch (err) {
-    if (err instanceof SpinError) {
+    if (err instanceof RerollError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
     if (err instanceof Error && err.message === "WHEEL_POOL_EMPTY") {
       return NextResponse.json(
-        { error: "No guildmates with aliases set yet." },
+        { error: "No guildmates available to reroll to." },
         { status: 400 }
       );
     }
-    console.error("[wheel-of-henricus/spin]", err);
+    console.error("[wheel-of-henricus/reroll]", err);
     return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

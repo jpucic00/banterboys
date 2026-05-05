@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isAdminEmail } from "@/lib/admin";
-import { SPIN_STAKE, getOrCreateActiveFrame } from "@/lib/wheel-of-henricus";
+import { getOrCreateActiveFrame } from "@/lib/wheel-of-henricus";
 
 export const dynamic = "force-dynamic";
 
@@ -33,14 +33,14 @@ export async function PATCH(req: NextRequest) {
 
     const spins = await tx.henricusSpin.findMany({
       where: { frameId: frame.id, assignedUserId: userId },
-      select: { id: true, spinnerUserId: true },
+      select: { id: true, spinnerUserId: true, stake: true },
     });
 
     const refundsBySpinner = new Map<string, number>();
     for (const s of spins) {
       refundsBySpinner.set(
         s.spinnerUserId,
-        (refundsBySpinner.get(s.spinnerUserId) ?? 0) + SPIN_STAKE
+        (refundsBySpinner.get(s.spinnerUserId) ?? 0) + s.stake
       );
     }
 

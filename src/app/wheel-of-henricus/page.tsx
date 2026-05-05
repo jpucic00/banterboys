@@ -2,10 +2,10 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { isAdminEmail } from "@/lib/admin";
 import {
-  MAX_SPINS_PER_FRAME,
   SPIN_STAKE,
   SPIN_PAYOUT,
   getOrCreateActiveFrame,
+  rerollCost,
 } from "@/lib/wheel-of-henricus";
 import HenricusWheelClient from "./HenricusWheelClient";
 
@@ -22,6 +22,7 @@ export default async function WheelOfHenricusPage() {
       select: {
         id: true,
         assignedAlias: true,
+        rerollCount: true,
         createdAt: true,
         spinner: { select: { id: true, name: true, alias: true, image: true } },
       },
@@ -55,6 +56,10 @@ export default async function WheelOfHenricusPage() {
     balance: number;
     userId: string | null;
     displayName: string | null;
+    hasSpun: boolean;
+    rerollCount: number;
+    currentChampion: string | null;
+    nextRerollCost: number;
   } = {
     isLoggedIn: false,
     isAdmin: false,
@@ -62,27 +67,38 @@ export default async function WheelOfHenricusPage() {
     balance: 0,
     userId: null,
     displayName: null,
+    hasSpun: false,
+    rerollCount: 0,
+    currentChampion: null,
+    nextRerollCost: rerollCost(0),
   };
 
   if (session?.user?.id) {
     const userId = session.user.id;
-    const [user, mySpins] = await Promise.all([
+    const [user, mySpin] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
         select: { saldoTibiaCoins: true, name: true, alias: true },
       }),
-      prisma.henricusSpin.count({
+      prisma.henricusSpin.findFirst({
         where: { frameId: frame.id, spinnerUserId: userId },
+        select: { rerollCount: true, assignedAlias: true },
       }),
     ]);
+    const hasSpun = !!mySpin;
+    const rc = mySpin?.rerollCount ?? 0;
     userState = {
       isLoggedIn: true,
       isAdmin:
         session.user.role === "ADMIN" || isAdminEmail(session.user.email),
-      spinsRemaining: Math.max(0, MAX_SPINS_PER_FRAME - mySpins),
+      spinsRemaining: hasSpun ? 0 : 1,
       balance: user?.saldoTibiaCoins ?? 0,
       userId,
       displayName: user?.alias ?? user?.name ?? null,
+      hasSpun,
+      rerollCount: rc,
+      currentChampion: mySpin?.assignedAlias ?? null,
+      nextRerollCost: rerollCost(rc),
     };
   }
 
@@ -99,6 +115,7 @@ export default async function WheelOfHenricusPage() {
     spins: spins.map((s) => ({
       id: s.id,
       assignedAlias: s.assignedAlias,
+      rerollCount: s.rerollCount,
       createdAt: s.createdAt.toISOString(),
       spinner: s.spinner,
     })),
