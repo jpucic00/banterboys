@@ -7,7 +7,10 @@ export async function GET() {
     where: {
       status: EventStatus.UPCOMING,
       commenceTime: { gt: new Date() },
-      espnEventId: { not: null },
+      OR: [
+        { espnEventId: { not: null } },
+        { sport: { key: { startsWith: "custom_" } } },
+      ],
     },
     include: {
       sport: true,

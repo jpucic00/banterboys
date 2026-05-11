@@ -46,6 +46,7 @@ const SPORT_TYPE_META: Record<string, { label: string; emoji: string }> = {
   cricket:          { label: "Cricket",          emoji: "🏏" },
   golf:             { label: "Golf",             emoji: "⛳" },
   aussierules:      { label: "Aussie Rules",     emoji: "🏉" },
+  pvp:              { label: "PvP",              emoji: "⚔️" },
 };
 
 const LEAGUE_LABELS: Record<string, string> = {
@@ -87,6 +88,7 @@ const LEAGUE_LABELS: Record<string, string> = {
 };
 
 function sportTypeKey(key: string) {
+  if (key.startsWith("custom_")) return "pvp";
   return key.split("_")[0];
 }
 

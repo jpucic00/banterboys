@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
 import SaldoManager from "@/components/SaldoManager";
+import CustomEventsManager from "@/components/CustomEventsManager";
 import { isAdminEmail } from "@/lib/admin";
 import AdminTabs from "@/components/AdminTabs";
 import { Section, StatGrid, Stat, CurrencyStat, fmtStat as fmt } from "@/components/StatCards";
@@ -214,6 +215,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const { tab = "overview" } = await searchParams;
   const isBalances = tab === "balances";
+  const isCustomEvents = tab === "events";
 
   const now = new Date();
   const day7Ago = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -315,6 +317,10 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
       {isBalances ? (
         <Section title="Player Balances">
           <SaldoManager />
+        </Section>
+      ) : isCustomEvents ? (
+        <Section title="Custom Events">
+          <CustomEventsManager />
         </Section>
       ) : (
         <>

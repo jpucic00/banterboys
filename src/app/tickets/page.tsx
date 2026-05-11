@@ -35,7 +35,7 @@ interface SlipSelection {
 }
 
 // Sport category mapping
-type SportCategory = "all" | "basketball" | "football" | "hockey" | "tennis" | "mma";
+type SportCategory = "all" | "basketball" | "football" | "hockey" | "tennis" | "mma" | "pvp";
 
 const SPORT_CATEGORIES: Record<string, SportCategory> = {
   basketball_nba: "basketball",
@@ -61,6 +61,11 @@ const SPORT_CATEGORIES: Record<string, SportCategory> = {
   tennis_atp_us_open: "tennis",
   mma_mixed_martial_arts: "mma",
 };
+
+function categoryFor(sportKey: string): SportCategory {
+  if (sportKey.startsWith("custom_")) return "pvp";
+  return SPORT_CATEGORIES[sportKey] ?? "all";
+}
 
 const LEAGUE_NAMES: Record<string, string> = {
   basketball_nba: "NBA",
@@ -143,6 +148,21 @@ function IconHockey({ className }: { className?: string }) {
   );
 }
 
+function IconPvP({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14.5 17.5L4 7V4h3l10.5 10.5" />
+      <line x1="13" y1="19" x2="19" y2="13" />
+      <line x1="16" y1="16" x2="20" y2="20" />
+      <line x1="19" y1="21" x2="21" y2="19" />
+      <path d="M9.5 17.5L20 7V4h-3L6.5 14.5" />
+      <line x1="11" y1="19" x2="5" y2="13" />
+      <line x1="8" y1="16" x2="4" y2="20" />
+      <line x1="5" y1="21" x2="3" y2="19" />
+    </svg>
+  );
+}
+
 const SPORT_TABS: { id: SportCategory; label: string; Icon: React.FC<{ className?: string }> }[] = [
   { id: "all", label: "All", Icon: ({ className }) => <span className={className}>★</span> },
   { id: "basketball", label: "NBA", Icon: IconBasketball },
@@ -150,16 +170,18 @@ const SPORT_TABS: { id: SportCategory; label: string; Icon: React.FC<{ className
   { id: "hockey", label: "NHL", Icon: IconHockey },
   { id: "tennis", label: "Tennis", Icon: IconTennis },
   { id: "mma", label: "MMA", Icon: IconMMA },
+  { id: "pvp", label: "PvP", Icon: IconPvP },
 ];
 
 function LeagueIcon({ sportKey }: { sportKey: string }) {
-  const cat = SPORT_CATEGORIES[sportKey];
+  const cat = categoryFor(sportKey);
   const cls = "w-3.5 h-3.5";
   if (cat === "basketball") return <IconBasketball className={cls} />;
   if (cat === "football") return <IconFootball className={cls} />;
   if (cat === "hockey") return <IconHockey className={cls} />;
   if (cat === "tennis") return <IconTennis className={cls} />;
   if (cat === "mma") return <IconMMA className={cls} />;
+  if (cat === "pvp") return <IconPvP className={cls} />;
   return null;
 }
 
@@ -509,10 +531,16 @@ export default function TicketsPage() {
   const filteredEvents =
     sportCategory === "all"
       ? events
-      : events.filter((e) => SPORT_CATEGORIES[e.sport.key] === sportCategory);
+      : events.filter((e) => categoryFor(e.sport.key) === sportCategory);
 
   // Derive available leagues within the current sport category filter
   const availableLeagues = Array.from(new Set(filteredEvents.map((e) => e.sport.key)));
+
+  // Sport key -> display name (Sport.name) for custom leagues not in LEAGUE_NAMES
+  const sportNames = events.reduce<Record<string, string>>((acc, e) => {
+    if (!acc[e.sport.key]) acc[e.sport.key] = e.sport.name;
+    return acc;
+  }, {});
 
   // Filter further by selected league
   const leagueFilteredEvents =
@@ -530,7 +558,7 @@ export default function TicketsPage() {
 
   // Determine which sport tabs actually have events
   const categoriesWithEvents = new Set(
-    events.map((e) => SPORT_CATEGORIES[e.sport.key]).filter(Boolean)
+    events.map((e) => categoryFor(e.sport.key)).filter(Boolean)
   );
 
   return (
@@ -627,7 +655,7 @@ export default function TicketsPage() {
                   <option value="all">All Leagues</option>
                   {availableLeagues.map((leagueKey) => (
                     <option key={leagueKey} value={leagueKey}>
-                      {LEAGUE_NAMES[leagueKey] ?? leagueKey}
+                      {LEAGUE_NAMES[leagueKey] ?? sportNames[leagueKey] ?? leagueKey}
                     </option>
                   ))}
                 </select>
@@ -650,7 +678,7 @@ export default function TicketsPage() {
                 >
                   <LeagueIcon sportKey={sportKey} />
                   <span className="text-xs font-bold uppercase tracking-wider text-text-secondary">
-                    {LEAGUE_NAMES[sportKey] ?? sportKey}
+                    {LEAGUE_NAMES[sportKey] ?? sportNames[sportKey] ?? sportKey}
                   </span>
                   <span className="ml-auto text-xs text-text-muted">
                     {leagueEvents.length} match{leagueEvents.length !== 1 ? "es" : ""}
