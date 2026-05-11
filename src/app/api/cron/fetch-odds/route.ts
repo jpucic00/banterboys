@@ -119,23 +119,26 @@ export async function GET(req: NextRequest) {
         // ~17 EU/UK books (marathonbet, unibet_*, leovegas, betway, …) quote regulation-time
         // 3-way under the same h2h key; we pick one of those when available so draw/1X/2X
         // match our regulation-time settlement. Falls back to the first bookmaker otherwise.
-        const bookmaker =
-          apiEvent.bookmakers.find((b) =>
-            b.markets.some(
-              (m) => m.key === "h2h" && m.outcomes.some((o) => o.name === "Draw")
-            )
-          ) ?? apiEvent.bookmakers[0];
+        const bookmaker = sportKey === "mma_mixed_martial_arts"
+          ? apiEvent.bookmakers[0]
+          : apiEvent.bookmakers.find((b) =>
+              b.markets.some(
+                (m) => m.key === "h2h" && m.outcomes.some((o) => o.name === "Draw")
+              )
+            ) ?? apiEvent.bookmakers[0];
         if (bookmaker) {
           const h2h = bookmaker.markets.find((m) => m.key === "h2h");
           if (h2h) {
             const homeOutcome = h2h.outcomes.find((o) => o.name === apiEvent.home_team);
             const awayOutcome = h2h.outcomes.find((o) => o.name === apiEvent.away_team);
             const drawOutcome = h2h.outcomes.find((o) => o.name === "Draw");
+            const isMma = sportKey === "mma_mixed_martial_arts";
 
             if (homeOutcome && awayOutcome) {
               // Derive double chance odds from h2h: 1X = 1/(1/home + 1/draw), 2X = 1/(1/away + 1/draw)
               // No extra margin — bookmaker margin from h2h carries through. Floor at 1.05 for heavy favorites.
-              const drawPrice = drawOutcome?.price ?? null;
+              // MMA has no draws — ignore any draw outcome the API returns.
+              const drawPrice = !isMma ? (drawOutcome?.price ?? null) : null;
               const rawHomeDraw = drawPrice ? 1 / (1 / homeOutcome.price + 1 / drawPrice) : null;
               const rawAwayDraw = drawPrice ? 1 / (1 / awayOutcome.price + 1 / drawPrice) : null;
               const homeDrawOdds = rawHomeDraw ? Math.round(Math.max(rawHomeDraw, 1.05) * 100) / 100 : null;
