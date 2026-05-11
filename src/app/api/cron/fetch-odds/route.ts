@@ -266,19 +266,7 @@ export async function GET(req: NextRequest) {
       // ── ESPN ID mapping ────────────────────────────────────────────────
       if (sportKey in ESPN_SPORT_MAP) {
         const unmapped = await prisma.event.findMany({
-          where: {
-            sportId: sport.id,
-            OR: [
-              { espnEventId: null },
-              { homeLogoUrl: null },
-              // Re-match unsettled MMA events that predate the espnReversed flag
-              ...(sportKey === "mma_mixed_martial_arts" ? [{
-                espnEventId: { not: null },
-                espnReversed: false,
-                status: { in: ["UPCOMING" as const, "LIVE" as const] },
-              }] : []),
-            ],
-          },
+          where: { sportId: sport.id, OR: [{ espnEventId: null }, { homeLogoUrl: null }] },
         });
 
         if (unmapped.length > 0) {
