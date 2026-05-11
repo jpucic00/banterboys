@@ -15,14 +15,18 @@ import { EventStatus } from "@prisma/client";
 function resolveFinalScores(
   sportKey: string,
   espnEvent: EspnEvent,
+  reversed: boolean,
 ): { homeScore: number | null; awayScore: number | null; status: EventStatus } {
   if (sportKey === "mma_mixed_martial_arts") {
-    if (espnEvent.winningSide === "home") return { homeScore: 1, awayScore: 0, status: EventStatus.COMPLETED };
-    if (espnEvent.winningSide === "away") return { homeScore: 0, awayScore: 1, status: EventStatus.COMPLETED };
+    const side = reversed
+      ? (espnEvent.winningSide === "home" ? "away" : espnEvent.winningSide === "away" ? "home" : null)
+      : espnEvent.winningSide;
+    if (side === "home") return { homeScore: 1, awayScore: 0, status: EventStatus.COMPLETED };
+    if (side === "away") return { homeScore: 0, awayScore: 1, status: EventStatus.COMPLETED };
     return { homeScore: null, awayScore: null, status: EventStatus.CANCELLED };
   }
-  let homeScore = Math.round(espnEvent.homeScore);
-  let awayScore = Math.round(espnEvent.awayScore);
+  let homeScore = Math.round(reversed ? espnEvent.awayScore : espnEvent.homeScore);
+  let awayScore = Math.round(reversed ? espnEvent.homeScore : espnEvent.awayScore);
   if (espnEvent.wentToExtraTime) {
     const drawScore = Math.min(homeScore, awayScore);
     homeScore = drawScore;
@@ -100,7 +104,7 @@ async function runLiveScores() {
           // Settle just-completed events (same logic as sweep, but for today's active events)
           if (event.status === EventStatus.COMPLETED || event.status === EventStatus.CANCELLED) continue;
 
-          const resolved = resolveFinalScores(sportKey, espnEvent);
+          const resolved = resolveFinalScores(sportKey, espnEvent, event.espnReversed);
           await prisma.event.update({
             where: { id: event.id },
             data: {
@@ -117,11 +121,13 @@ async function runLiveScores() {
           settled.push(`${event.homeTeam} vs ${event.awayTeam}`);
         } else if (espnEvent.inProgress) {
           // Update live score and clock
+          const liveHome = event.espnReversed ? Math.round(espnEvent.awayScore) : Math.round(espnEvent.homeScore);
+          const liveAway = event.espnReversed ? Math.round(espnEvent.homeScore) : Math.round(espnEvent.awayScore);
           await prisma.event.update({
             where: { id: event.id },
             data: {
-              liveHomeScore: Math.round(espnEvent.homeScore),
-              liveAwayScore: Math.round(espnEvent.awayScore),
+              liveHomeScore: liveHome,
+              liveAwayScore: liveAway,
               liveClock: espnEvent.statusDetail ?? null,
               status: EventStatus.LIVE,
             },
@@ -170,7 +176,7 @@ async function runSettlementSweep() {
         });
         if (!event || event.status === EventStatus.COMPLETED || event.status === EventStatus.CANCELLED) continue;
 
-        const resolved = resolveFinalScores(sportKey, espnEvent);
+        const resolved = resolveFinalScores(sportKey, espnEvent, event.espnReversed);
         await prisma.event.update({
           where: { id: event.id },
           data: {

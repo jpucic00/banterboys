@@ -158,6 +158,7 @@ model Event {
   status        EventStatus @default(UPCOMING)
   completedAt   DateTime?
   espnEventId   String?     @unique
+  espnReversed  Boolean     @default(false)
   homeLogoUrl   String?
   awayLogoUrl   String?
   updatedAt     DateTime    @updatedAt

@@ -71,10 +71,9 @@ function resolveLogoUrl(sportKey: string, abbrev?: string, apiLogo?: string): st
   return undefined;
 }
 
-/** ESPN status names that indicate the match went beyond 90 minutes.
- *  ESPN uses different spellings across leagues (FINAL_AET for DFB-Pokal,
- *  FINAL_PEN for Coppa Italia). Include all observed variants. */
-const EXTRA_TIME_STATUSES = new Set([
+/** Soccer status names ESPN returns for completed ET / penalty matches.
+ *  Names vary by competition (DFB-Pokal: STATUS_FINAL_AET, Coppa Italia: STATUS_FINAL_PEN). */
+const SOCCER_EXTRA_TIME_STATUS_NAMES = new Set([
   "STATUS_OVERTIME",
   "STATUS_END_OF_EXTRA_TIME",
   "STATUS_PENALTIES",
@@ -84,6 +83,16 @@ const EXTRA_TIME_STATUSES = new Set([
   "STATUS_FINAL_AET",
   "STATUS_FINAL_PEN",
 ]);
+
+/** NHL completed games are always STATUS_FINAL regardless of OT/SO — the signal is in shortDetail.
+ *  Matches `Final/OT`, `Final/2OT`, `Final/3OT`, …, `Final/SO`. */
+const NHL_EXTRA_TIME_SHORTDETAIL = /^Final\/(?:\d?OT|SO)$/;
+
+function isExtraTime(sportKey: string, statusName: string | undefined, shortDetail: string | undefined): boolean {
+  if (isSoccerSport(sportKey)) return SOCCER_EXTRA_TIME_STATUS_NAMES.has(statusName ?? "");
+  if (sportKey === "icehockey_nhl") return NHL_EXTRA_TIME_SHORTDETAIL.test(shortDetail ?? "");
+  return false;
+}
 
 interface EspnCompetition {
   id: string;
@@ -137,7 +146,7 @@ function parseEspnEvents(data: EspnScoreboardResponse, sportKey: string): EspnEv
         completed: comp.status.type.completed,
         inProgress: comp.status.type.state === "in",
         eventDate: new Date(comp.date ?? event.date),
-        wentToExtraTime: (isSoccerSport(sportKey) || sportKey === 'icehockey_nhl') && EXTRA_TIME_STATUSES.has(comp.status.type.name ?? ""),
+        wentToExtraTime: isExtraTime(sportKey, comp.status.type.name, comp.status.type.shortDetail),
         statusDetail: comp.status.type.shortDetail,
         winningSide,
       });
@@ -248,13 +257,18 @@ const TEAM_SIMILARITY_THRESHOLD = 0.65;
  *
  *  Time window is 3h for team sports (same kick-off time in both APIs),
  *  24h for MMA (cards can run long / exact times less reliable). */
+export interface EspnMatchResult {
+  event: EspnEvent;
+  reversed: boolean;
+}
+
 export function findEspnMatch(
   homeTeam: string,
   awayTeam: string,
   commenceTime: Date,
   espnEvents: EspnEvent[],
   sportKey?: string
-): EspnEvent | null {
+): EspnMatchResult | null {
   const timeWindowMs = 48 * 60 * 60 * 1000; // 48h — covers ±1 day date boundary differences between Odds API and ESPN
 
   // ── 1. Abbreviation lookup (exact match, no time window needed) ──────────
@@ -265,8 +279,8 @@ export function findEspnMatch(
     const awayAbbrev = sportMap[awayTeam];
     if (homeAbbrev && awayAbbrev) {
       for (const e of espnEvents) {
-        if (e.homeAbbrev === homeAbbrev && e.awayAbbrev === awayAbbrev) return e;
-        if (e.homeAbbrev === awayAbbrev && e.awayAbbrev === homeAbbrev) return e; // reversed (MMA-style)
+        if (e.homeAbbrev === homeAbbrev && e.awayAbbrev === awayAbbrev) return { event: e, reversed: false };
+        if (e.homeAbbrev === awayAbbrev && e.awayAbbrev === homeAbbrev) return { event: e, reversed: true };
       }
     }
   }
@@ -279,6 +293,7 @@ export function findEspnMatch(
 
   let bestMatch: EspnEvent | null = null;
   let bestScore = -1;
+  let bestReversed = false;
 
   for (const e of espnEvents) {
     if (Math.abs(e.eventDate.getTime() - commenceTime.getTime()) > timeWindowMs) continue;
@@ -297,8 +312,9 @@ export function findEspnMatch(
     if (score > bestScore) {
       bestScore = score;
       bestMatch = e;
+      bestReversed = score2 > score1;
     }
   }
 
-  return bestMatch;
+  return bestMatch ? { event: bestMatch, reversed: bestReversed } : null;
 }

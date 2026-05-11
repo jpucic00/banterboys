@@ -312,9 +312,10 @@ export async function GET(req: NextRequest) {
                 await prisma.event.update({
                   where: { id: ev.id },
                   data: {
-                    espnEventId: espnMatch.id,
-                    homeLogoUrl: espnMatch.homeLogo ?? null,
-                    awayLogoUrl: espnMatch.awayLogo ?? null,
+                    espnEventId: espnMatch.event.id,
+                    espnReversed: espnMatch.reversed,
+                    homeLogoUrl: espnMatch.event.homeLogo ?? null,
+                    awayLogoUrl: espnMatch.event.awayLogo ?? null,
                   },
                 }).catch(() => {});
                 mapped++;
