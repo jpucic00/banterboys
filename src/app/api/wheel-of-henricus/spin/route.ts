@@ -9,7 +9,6 @@ import {
   pickRandomAssignee,
   getOrCreateActiveFrame,
   eligibleWheelUsers,
-  rerollCost,
 } from "@/lib/wheel-of-henricus";
 import { notifyHenricusChampionSelected } from "@/lib/discord-notify";
 
@@ -48,10 +47,11 @@ export async function POST() {
 
       const frame = await getOrCreateActiveFrame(tx);
 
-      const existingSpins = await tx.henricusSpin.count({
+      const mySpins = await tx.henricusSpin.findMany({
         where: { frameId: frame.id, spinnerUserId: userId },
+        select: { assignedUserId: true },
       });
-      if (existingSpins >= MAX_SPINS_PER_FRAME) {
+      if (mySpins.length >= MAX_SPINS_PER_FRAME) {
         throw new SpinError(
           `You've used all ${MAX_SPINS_PER_FRAME} spins for this round. Wait for the wheel to settle.`
         );
@@ -64,7 +64,18 @@ export async function POST() {
         );
       }
 
-      const assignee = pickRandomAssignee(pool);
+      // Each of a user's up-to-3 spins must land a distinct champion: settlement
+      // pays per winning spin, so a duplicate champion would multiply the payout
+      // on a single death. Exclude everyone this user already drew this round.
+      const alreadyDrawn = new Set(mySpins.map((s) => s.assignedUserId));
+      const availablePool = pool.filter((u) => !alreadyDrawn.has(u.id));
+      if (availablePool.length === 0) {
+        throw new SpinError(
+          "You've already drawn every available guildmate this round."
+        );
+      }
+
+      const assignee = pickRandomAssignee(availablePool);
 
       const spin = await tx.henricusSpin.create({
         data: {
@@ -95,9 +106,7 @@ export async function POST() {
         assignedAlias: assignee.alias,
         assignedDisplayName: assignee.name ?? assignee.alias,
         newBalance: updatedUser.saldoTibiaCoins,
-        spinsRemaining: MAX_SPINS_PER_FRAME - existingSpins - 1,
-        rerollCount: 0,
-        nextRerollCost: rerollCost(0),
+        spinsRemaining: MAX_SPINS_PER_FRAME - mySpins.length - 1,
         frameId: frame.id,
       };
     });

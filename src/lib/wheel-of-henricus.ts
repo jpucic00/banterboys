@@ -9,14 +9,7 @@ function envNonNegativeInt(key: string, fallback: number): number {
 
 export const SPIN_STAKE = envNonNegativeInt("HENRICUS_SPIN_STAKE", 25);
 export const SPIN_PAYOUT = envNonNegativeInt("HENRICUS_SPIN_PAYOUT", 500);
-export const MAX_SPINS_PER_FRAME = 1;
-
-export const REROLL_INCREMENT = envNonNegativeInt("HENRICUS_REROLL_INCREMENT", 5);
-export const REROLL_BASE_COST = SPIN_STAKE + REROLL_INCREMENT;
-
-export function rerollCost(rerollCount: number): number {
-  return REROLL_BASE_COST + REROLL_INCREMENT * rerollCount;
-}
+export const MAX_SPINS_PER_FRAME = 3;
 
 type Tx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"> | Prisma.TransactionClient;
 

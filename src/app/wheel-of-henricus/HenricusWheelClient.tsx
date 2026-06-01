@@ -14,7 +14,6 @@ type SpinnerInfo = {
 type Spin = {
   id: string;
   assignedAlias: string;
-  rerollCount: number;
   createdAt: string;
   spinner: SpinnerInfo;
 };
@@ -41,10 +40,7 @@ type UserState = {
   balance: number;
   userId: string | null;
   displayName: string | null;
-  hasSpun: boolean;
-  rerollCount: number;
-  currentChampion: string | null;
-  nextRerollCost: number;
+  myChampions: string[];
 };
 
 type InitialState = {
@@ -63,20 +59,9 @@ type SpinResponse = {
   assignedDisplayName: string;
   newBalance: number;
   spinsRemaining: number;
-  rerollCount: number;
-  nextRerollCost: number;
   frameId: string;
 };
 
-type RerollResponse = {
-  spinId: string;
-  assignedAlias: string;
-  assignedDisplayName: string;
-  newBalance: number;
-  rerollCount: number;
-  nextRerollCost: number;
-  frameId: string;
-};
 const ANIMATION_MS = 4500;
 
 function timeAgo(iso: string): string {
@@ -103,10 +88,9 @@ export default function HenricusWheelClient({
   const [state, setState] = useState(initialState);
   const [spinning, setSpinning] = useState(false);
   const [rotation, setRotation] = useState(0);
-  const [reveal, setReveal] = useState<SpinResponse | RerollResponse | null>(null);
+  const [reveal, setReveal] = useState<SpinResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [tick, setTick] = useState(0);
-  const [rerollConfirm, setRerollConfirm] = useState(false);
   const lastFrameId = useRef(initialState.frame.id);
   const SPIN_STAKE = state.config.spinStake;
   const SPIN_PAYOUT = state.config.spinPayout;
@@ -181,8 +165,8 @@ export default function HenricusWheelClient({
       setError("Sign in with Discord to spin.");
       return;
     }
-    if (state.user.hasSpun) {
-      setError("You already have a champion this round. Use reroll to change.");
+    if (state.user.spinsRemaining <= 0) {
+      setError("You've used all your spins this round.");
       return;
     }
     if (state.user.balance - SPIN_STAKE < -500) {
@@ -212,7 +196,6 @@ export default function HenricusWheelClient({
             {
               id: json.spinId,
               assignedAlias: json.assignedAlias,
-              rerollCount: 0,
               createdAt: json.createdAt,
               spinner: {
                 id: prev.user.userId ?? "self",
@@ -227,11 +210,8 @@ export default function HenricusWheelClient({
           user: {
             ...prev.user,
             balance: json.newBalance,
-            spinsRemaining: 0,
-            hasSpun: true,
-            rerollCount: 0,
-            currentChampion: json.assignedAlias,
-            nextRerollCost: json.nextRerollCost,
+            spinsRemaining: json.spinsRemaining,
+            myChampions: [...prev.user.myChampions, json.assignedAlias],
           },
         }));
       }, ANIMATION_MS);
@@ -241,56 +221,11 @@ export default function HenricusWheelClient({
     }
   }, [spinning, state.user, animateToAlias, SPIN_STAKE]);
 
-  const handleReroll = useCallback(async () => {
-    if (spinning) return;
-    setRerollConfirm(false);
-    setError(null);
-    setSpinning(true);
-
-    try {
-      const res = await fetch("/api/wheel-of-henricus/reroll", { method: "POST" });
-      const json: RerollResponse | { error: string } = await res.json();
-      if (!res.ok || "error" in json) {
-        setError(("error" in json && json.error) || "Reroll failed.");
-        setSpinning(false);
-        return;
-      }
-
-      setRotation(animateToAlias(json.assignedAlias));
-
-      window.setTimeout(() => {
-        setReveal(json);
-        setSpinning(false);
-        setState((prev) => ({
-          ...prev,
-          spins: prev.spins.map((s) =>
-            s.id === json.spinId
-              ? { ...s, assignedAlias: json.assignedAlias, rerollCount: json.rerollCount }
-              : s
-          ),
-          user: {
-            ...prev.user,
-            balance: json.newBalance,
-            rerollCount: json.rerollCount,
-            currentChampion: json.assignedAlias,
-            nextRerollCost: json.nextRerollCost,
-          },
-        }));
-      }, ANIMATION_MS);
-    } catch {
-      setError("Network error. Try again.");
-      setSpinning(false);
-    }
-  }, [spinning, animateToAlias]);
-
   const balanceStr = state.user.balance.toLocaleString();
-  const { hasSpun, nextRerollCost } = state.user;
+  const { spinsRemaining, myChampions } = state.user;
   const spinDebtBlocked = state.user.balance - SPIN_STAKE < -500;
-  const rerollDebtBlocked = state.user.balance - nextRerollCost < -500;
   const canSpin =
-    state.user.isLoggedIn && !hasSpun && !spinDebtBlocked && !spinning;
-  const canReroll =
-    state.user.isLoggedIn && hasSpun && !rerollDebtBlocked && !spinning;
+    state.user.isLoggedIn && spinsRemaining > 0 && !spinDebtBlocked && !spinning;
 
   const revealedUser = reveal
     ? state.eligibleUsers.find((u) => u.alias === reveal.assignedAlias)
@@ -331,8 +266,10 @@ export default function HenricusWheelClient({
               Pay{" "}
               <span className="text-[#F0A818] font-mono">{SPIN_STAKE} TC</span>{" "}
               to spin. The wheel picks a random Tibia character from the guild
-              — that's your champion for the round. Don't like it? Reroll
-              for <span className="text-[#F0A818] font-mono">10, 15, 20 TC…</span> (escalating).
+              — that's a champion for the round. Spin up to{" "}
+              <span className="text-[#F0A818] font-mono">3 times</span> for up to
+              three different champions, each a separate{" "}
+              <span className="text-[#F0A818] font-mono">{SPIN_STAKE} TC</span> bet.
             </p>
           </div>
           <div>
@@ -511,55 +448,39 @@ export default function HenricusWheelClient({
             </div>
           </div>
 
-          {!hasSpun ? (
-            <button
-              onClick={handleSpin}
-              disabled={!canSpin}
-              className={`w-full py-3 rounded-md text-base font-bold tracking-widest transition-all ${
-                canSpin
-                  ? "bg-[#F0A818] text-[#0a0a0a] hover:bg-[#ffb830] hover:scale-[1.02] cursor-pointer shadow-[0_0_20px_#F0A81866]"
-                  : "bg-[#2a2a2a] text-text-muted cursor-not-allowed"
-              }`}
-            >
-              {spinning
-                ? "SPINNING…"
-                : !state.user.isLoggedIn
-                ? "SIGN IN TO SPIN"
-                : spinDebtBlocked
-                ? "DEBT LIMIT REACHED"
-                : SPIN_STAKE === 0
-                ? "FREE SPIN"
-                : `SPIN — ${SPIN_STAKE} TC`}
-            </button>
-          ) : (
-            <button
-              onClick={() => setRerollConfirm(true)}
-              disabled={!canReroll}
-              className={`w-full py-3 rounded-md text-base font-bold tracking-widest transition-all ${
-                canReroll
-                  ? "bg-[#F0A818] text-[#0a0a0a] hover:bg-[#ffb830] hover:scale-[1.02] cursor-pointer shadow-[0_0_20px_#F0A81866]"
-                  : "bg-[#2a2a2a] text-text-muted cursor-not-allowed"
-              }`}
-            >
-              {spinning
-                ? "SPINNING…"
-                : rerollDebtBlocked
-                ? "DEBT LIMIT REACHED"
-                : `REROLL — ${nextRerollCost} TC`}
-            </button>
-          )}
+          <button
+            onClick={handleSpin}
+            disabled={!canSpin}
+            className={`w-full py-3 rounded-md text-base font-bold tracking-widest transition-all ${
+              canSpin
+                ? "bg-[#F0A818] text-[#0a0a0a] hover:bg-[#ffb830] hover:scale-[1.02] cursor-pointer shadow-[0_0_20px_#F0A81866]"
+                : "bg-[#2a2a2a] text-text-muted cursor-not-allowed"
+            }`}
+          >
+            {spinning
+              ? "SPINNING…"
+              : !state.user.isLoggedIn
+              ? "SIGN IN TO SPIN"
+              : spinsRemaining <= 0
+              ? "ALL 3 CHAMPIONS DRAWN"
+              : spinDebtBlocked
+              ? "DEBT LIMIT REACHED"
+              : SPIN_STAKE === 0
+              ? `FREE SPIN · ${spinsRemaining} LEFT`
+              : `SPIN — ${SPIN_STAKE} TC · ${spinsRemaining} LEFT`}
+          </button>
 
           <div className="text-xs text-text-muted text-center space-y-1">
             <div>
-              {hasSpun ? (
+              {myChampions.length > 0 ? (
                 <>
-                  Your champion:{" "}
+                  Your champion{myChampions.length > 1 ? "s" : ""}:{" "}
                   <span className="text-[#F0A818] font-medium">
-                    {state.user.currentChampion}
+                    {myChampions.join(", ")}
                   </span>
-                  {state.user.rerollCount > 0 && (
+                  {spinsRemaining > 0 && (
                     <span className="text-text-muted">
-                      {" "}(rerolled {state.user.rerollCount}x)
+                      {" "}({spinsRemaining} spin{spinsRemaining > 1 ? "s" : ""} left)
                     </span>
                   )}
                 </>
@@ -651,11 +572,6 @@ export default function HenricusWheelClient({
                     <span className="text-[#F0A818] font-medium truncate">
                       {s.assignedAlias}
                     </span>
-                    {s.rerollCount > 0 && (
-                      <span className="text-text-muted text-[10px] shrink-0">
-                        (rerolled {s.rerollCount}x)
-                      </span>
-                    )}
                   </div>
                   <span className="text-xs text-text-muted shrink-0 tabular-nums">
                     {tick >= 0 && timeAgo(s.createdAt)}
@@ -680,7 +596,7 @@ export default function HenricusWheelClient({
             onClick={(e) => e.stopPropagation()}
           >
             <div className="text-xs uppercase tracking-widest text-text-muted">
-              {reveal.rerollCount > 0 ? "Rerolled to" : "You drew"}
+              You drew
             </div>
             <div className="mt-4 flex justify-center">
               {revealedUser?.image ? (
@@ -711,10 +627,10 @@ export default function HenricusWheelClient({
             <div className="mt-6 grid grid-cols-2 gap-3 text-xs">
               <div className="border border-border bg-[#0f0f0f] rounded p-2">
                 <div className="text-text-muted uppercase tracking-widest">
-                  Next reroll
+                  Spins left
                 </div>
                 <div className="text-[#F0A818] text-lg font-mono">
-                  {reveal.nextRerollCost} TC
+                  {reveal.spinsRemaining}
                 </div>
               </div>
               <div className="border border-border bg-[#0f0f0f] rounded p-2">
@@ -727,64 +643,33 @@ export default function HenricusWheelClient({
               </div>
             </div>
             <div className="mt-6 flex gap-3 justify-center">
-              <button
-                onClick={() => {
-                  setReveal(null);
-                  setRerollConfirm(true);
-                }}
-                className="px-6 py-2 border border-[#F0A818] text-[#F0A818] rounded font-bold hover:bg-[#F0A818]/10 cursor-pointer"
-              >
-                REROLL — {reveal.nextRerollCost} TC
-              </button>
+              {reveal.spinsRemaining > 0 && (
+                <button
+                  onClick={() => {
+                    setReveal(null);
+                    handleSpin();
+                  }}
+                  disabled={spinDebtBlocked}
+                  className={`px-6 py-2 border rounded font-bold ${
+                    spinDebtBlocked
+                      ? "border-border text-text-muted cursor-not-allowed"
+                      : "border-[#F0A818] text-[#F0A818] hover:bg-[#F0A818]/10 cursor-pointer"
+                  }`}
+                >
+                  SPIN AGAIN — {SPIN_STAKE} TC
+                </button>
+              )}
               <button
                 onClick={() => setReveal(null)}
                 className="px-6 py-2 bg-[#F0A818] text-[#0a0a0a] rounded font-bold hover:bg-[#ffb830] cursor-pointer"
               >
-                KEEP
+                DONE
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Reroll confirmation modal */}
-      {rerollConfirm && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setRerollConfirm(false)}
-        >
-          <div
-            className="max-w-sm w-full bg-[#141414] border-2 border-[#F0A818] rounded-lg p-8 text-center shadow-[0_0_60px_#F0A81866]"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="text-sm text-text-secondary">
-              Reroll your champion for
-            </div>
-            <div className="mt-2 text-3xl text-[#F0A818] font-mono font-bold">
-              {nextRerollCost} TC
-            </div>
-            <div className="mt-1 text-xs text-text-muted">
-              Current champion: {state.user.currentChampion}
-            </div>
-            <div className="mt-6 flex gap-3 justify-center">
-              <button
-                onClick={() => setRerollConfirm(false)}
-                className="px-6 py-2 border border-border text-text-muted rounded font-bold hover:bg-white/5 cursor-pointer"
-              >
-                CANCEL
-              </button>
-              <button
-                onClick={handleReroll}
-                className="px-6 py-2 bg-[#F0A818] text-[#0a0a0a] rounded font-bold hover:bg-[#ffb830] cursor-pointer"
-              >
-                REROLL
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
