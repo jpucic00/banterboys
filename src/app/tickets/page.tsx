@@ -35,7 +35,7 @@ interface SlipSelection {
 }
 
 // Sport category mapping
-type SportCategory = "all" | "basketball" | "football" | "hockey" | "tennis" | "mma" | "pvp";
+type SportCategory = "all" | "basketball" | "football" | "baseball" | "hockey" | "tennis" | "mma" | "pvp";
 
 const SPORT_CATEGORIES: Record<string, SportCategory> = {
   basketball_nba: "basketball",
@@ -56,6 +56,7 @@ const SPORT_CATEGORIES: Record<string, SportCategory> = {
   soccer_france_ligue_one: "football",
   soccer_conmebol_copa_libertadores: "football",
   icehockey_nhl: "hockey",
+  baseball_mlb: "baseball",
   tennis_atp_french_open: "tennis",
   tennis_atp_wimbledon: "tennis",
   tennis_atp_us_open: "tennis",
@@ -86,6 +87,7 @@ const LEAGUE_NAMES: Record<string, string> = {
   soccer_france_ligue_one: "Ligue 1",
   soccer_conmebol_copa_libertadores: "Copa Libertadores",
   icehockey_nhl: "NHL",
+  baseball_mlb: "MLB",
   tennis_atp_french_open: "French Open",
   tennis_atp_wimbledon: "Wimbledon",
   tennis_atp_us_open: "US Open",
@@ -148,6 +150,16 @@ function IconHockey({ className }: { className?: string }) {
   );
 }
 
+function IconBaseball({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M6 4.5C8.5 7 8.5 17 6 19.5" />
+      <path d="M18 4.5C15.5 7 15.5 17 18 19.5" />
+    </svg>
+  );
+}
+
 function IconPvP({ className }: { className?: string }) {
   return (
     <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -168,6 +180,7 @@ const SPORT_TABS: { id: SportCategory; label: string; Icon: React.FC<{ className
   { id: "basketball", label: "NBA", Icon: IconBasketball },
   { id: "football", label: "Football", Icon: IconFootball },
   { id: "hockey", label: "NHL", Icon: IconHockey },
+  { id: "baseball", label: "MLB", Icon: IconBaseball },
   { id: "tennis", label: "Tennis", Icon: IconTennis },
   { id: "mma", label: "MMA", Icon: IconMMA },
   { id: "pvp", label: "PvP", Icon: IconPvP },
@@ -179,6 +192,7 @@ function LeagueIcon({ sportKey }: { sportKey: string }) {
   if (cat === "basketball") return <IconBasketball className={cls} />;
   if (cat === "football") return <IconFootball className={cls} />;
   if (cat === "hockey") return <IconHockey className={cls} />;
+  if (cat === "baseball") return <IconBaseball className={cls} />;
   if (cat === "tennis") return <IconTennis className={cls} />;
   if (cat === "mma") return <IconMMA className={cls} />;
   if (cat === "pvp") return <IconPvP className={cls} />;

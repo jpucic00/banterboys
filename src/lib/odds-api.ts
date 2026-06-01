@@ -19,6 +19,7 @@ const SPORT_KEYS = [
   "soccer_france_ligue_one",
   "soccer_conmebol_copa_libertadores",
   "icehockey_nhl",
+  "baseball_mlb",
   "mma_mixed_martial_arts",
 ];
 

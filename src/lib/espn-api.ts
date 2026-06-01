@@ -21,6 +21,7 @@ export const ESPN_SPORT_MAP: Record<string, string> = {
   soccer_france_ligue_one:                   "soccer/fra.1",
   soccer_conmebol_copa_libertadores:         "soccer/conmebol.libertadores",
   icehockey_nhl:                              "hockey/nhl",
+  baseball_mlb:                               "baseball/mlb",
   mma_mixed_martial_arts:                     "mma/ufc",
 };
 
