@@ -48,6 +48,12 @@ export default function Navbar() {
           >
             Wheel of Henricus
           </NavLink>
+          <NavLink
+            href="/song-contest"
+            active={pathname.startsWith("/song-contest")}
+          >
+            Song Contest
+          </NavLink>
           {session && (
             <NavLink href="/profile" active={pathname === "/profile"}>My Profile</NavLink>
           )}
@@ -134,6 +140,13 @@ export default function Navbar() {
                 onClick={() => setMenuOpen(false)}
               >
                 Wheel of Henricus
+              </MobileLink>
+              <MobileLink
+                href="/song-contest"
+                active={pathname.startsWith("/song-contest")}
+                onClick={() => setMenuOpen(false)}
+              >
+                Song Contest
               </MobileLink>
               {session && (
                 <MobileLink href="/profile" active={pathname === "/profile"} onClick={() => setMenuOpen(false)}>My Profile</MobileLink>

@@ -60,6 +60,16 @@ enum HenricusFrameStatus {
   SETTLED
 }
 
+enum SongContestStatus {
+  OPEN
+  CLOSED
+}
+
+enum VoteDirection {
+  UP
+  DOWN
+}
+
 // NextAuth required models
 model Account {
   id                String  @id @default(cuid())
@@ -133,6 +143,9 @@ model User {
   gambleRounds             SlotGambleRound[]
   henricusSpinsAsSpinner   HenricusSpin[]    @relation("HenricusSpinner")
   henricusSpinsAsAssigned  HenricusSpin[]    @relation("HenricusAssigned")
+  songSubmissions          SongSubmission[]
+  songVotes                SongVote[]
+  songListens              SongListen[]
 }
 
 model Sport {
@@ -329,4 +342,112 @@ model HenricusSpin {
   @@index([assignedAlias])
   @@index([spinnerUserId])
   @@index([createdAt])
+}
+
+// Song Contest — guild members submit one song each, everyone votes, admin
+// closes the contest, most-voted submission wins. Prizes are display-only
+// (paid manually in-game) — no balance mutations anywhere in this feature.
+model SongContest {
+  id          String            @id @default(cuid())
+  title       String
+  description String            @db.Text
+  status      SongContestStatus @default(OPEN)
+  // Prize amounts in gold (display-only; settled by hand in-game).
+  prizeFirst      Float @default(20000000)
+  prizeSecond     Float @default(10000000)
+  prizeLuckyVoter Float @default(10000000)
+  createdAt   DateTime          @default(now())
+  closedAt    DateTime?
+
+  // Result snapshot captured when the contest closes, so the outcome stays
+  // stable even if submissions/votes are later removed.
+  winnerSubmissionId   String?
+  runnerUpSubmissionId String?
+  luckyVoterUserId     String?
+
+  submissions SongSubmission[]
+  votes       SongVote[]
+  listens     SongListen[]
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+model SongSubmission {
+  id        String   @id @default(cuid())
+  contestId String
+  userId    String
+  songTitle String // the title the submitter gives their entry
+  fileName  String // original upload filename
+  mimeType  String
+  sizeBytes Int
+  // Optional cover image (also bytea, in its own table). Null when none uploaded.
+  coverMimeType  String?
+  coverSizeBytes Int?
+  createdAt DateTime @default(now())
+
+  contest SongContest          @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  user    User                 @relation(fields: [userId], references: [id])
+  votes   SongVote[]
+  listens SongListen[]
+  blob    SongSubmissionBlob?
+  cover   SongSubmissionCover?
+
+  // One submission per user per contest. Immutable once created.
+  @@unique([contestId, userId])
+  @@index([contestId])
+}
+
+// Audio/video bytes live in their own table so listing submissions never
+// pulls the binary. Served via a Range-capable streaming route.
+model SongSubmissionBlob {
+  submissionId String         @id
+  data         Bytes
+  submission   SongSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+}
+
+// Optional cover image bytes, kept separate from the submission row for the
+// same reason as the audio blob. Served via its own image route.
+model SongSubmissionCover {
+  submissionId String         @id
+  data         Bytes
+  submission   SongSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+}
+
+model SongVote {
+  id           String        @id @default(cuid())
+  contestId    String
+  submissionId String
+  userId       String
+  direction    VoteDirection @default(UP)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  contest    SongContest    @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  submission SongSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  user       User           @relation(fields: [userId], references: [id])
+
+  // One vote per user per submission. The per-direction budget (2 up / 2 down
+  // per contest) is enforced in the vote route, not by the DB.
+  @@unique([userId, submissionId])
+  @@index([submissionId])
+  @@index([contestId])
+}
+
+// Records that a user has listened to a submission (≥15s, detected client-side).
+// Voting is gated on having a listen row for every other submission in the
+// contest, so progress persists across reloads and is enforced at the API.
+model SongListen {
+  id           String   @id @default(cuid())
+  contestId    String
+  submissionId String
+  userId       String
+  createdAt    DateTime @default(now())
+
+  contest    SongContest    @relation(fields: [contestId], references: [id], onDelete: Cascade)
+  submission SongSubmission @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  user       User           @relation(fields: [userId], references: [id])
+
+  @@unique([userId, submissionId])
+  @@index([contestId, userId])
 }

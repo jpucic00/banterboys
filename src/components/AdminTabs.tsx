@@ -7,6 +7,7 @@ const TABS = [
   { key: "overview", label: "Overview" },
   { key: "balances", label: "Balances" },
   { key: "events", label: "Custom Events" },
+  { key: "song", label: "Song Contest" },
 ] as const;
 
 export default function AdminTabs() {

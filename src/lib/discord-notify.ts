@@ -746,3 +746,147 @@ export async function notifySlotWin(spin: {
     ],
   });
 }
+
+// Gold formatted the way the guild talks about it: 20000000 -> "20kk".
+function formatGoldShort(amount: number): string {
+  if (amount >= 1_000_000) return `${parseFloat((amount / 1_000_000).toFixed(2))}kk`;
+  if (amount >= 1_000) return `${parseFloat((amount / 1_000).toFixed(2))}k`;
+  return `${amount}`;
+}
+
+export async function notifySongContestCreated(p: {
+  title: string;
+  description: string;
+  prizeFirst: number;
+  prizeSecond: number;
+  prizeLuckyVoter: number;
+}): Promise<void> {
+  const link = BASE_URL ? `\n\n[Enter the contest on Banter Boys](${BASE_URL}/song-contest)` : "";
+  await sendWebhook({
+    content: `🎤 **${p.title}** is now open! Submit your song and vote for your favourite.${link}`,
+    embeds: [
+      {
+        title: `🎤 ${p.title}`,
+        description: p.description,
+        color: COLORS.blue,
+        fields: [
+          { name: "🥇 1st place", value: `${formatGoldShort(p.prizeFirst)} gold`, inline: true },
+          { name: "🥈 2nd place", value: `${formatGoldShort(p.prizeSecond)} gold`, inline: true },
+          { name: "🍀 Lucky voter", value: `${formatGoldShort(p.prizeLuckyVoter)} gold`, inline: true },
+        ],
+        footer: { text: "Banter Boys Song Contest" },
+        timestamp: new Date().toISOString(),
+      },
+    ],
+  });
+}
+
+export async function notifySongContestClosed(p: {
+  title: string;
+  winner: { displayName: string; discordId: string | null; songTitle: string; upVotes: number; downVotes: number } | null;
+  runnerUp: { displayName: string; discordId: string | null; songTitle: string; upVotes: number; downVotes: number } | null;
+  luckyVoter: { displayName: string; discordId: string | null } | null;
+  prizeFirst: number;
+  prizeSecond: number;
+  prizeLuckyVoter: number;
+  totalSubmissions: number;
+  totalVotes: number;
+}): Promise<void> {
+  const tag = (x: { displayName: string; discordId: string | null }) =>
+    x.discordId ? `<@${x.discordId}>` : `**${x.displayName}**`;
+
+  const description = p.winner
+    ? `🏆 The votes are in! ${tag(p.winner)} wins **${p.title}** with *${p.winner.songTitle}* (${p.winner.upVotes}👍 / ${p.winner.downVotes}👎). Prizes are paid in-game by the house.`
+    : `**${p.title}** has closed, but no votes were cast — no winner this time.`;
+
+  const fields: { name: string; value: string; inline: boolean }[] = [];
+  if (p.winner) {
+    fields.push({
+      name: "🥇 Winner",
+      value: `${p.winner.displayName} — *${p.winner.songTitle}* · ${formatGoldShort(p.prizeFirst)} gold`,
+      inline: false,
+    });
+  }
+  if (p.runnerUp) {
+    fields.push({
+      name: "🥈 Runner-up",
+      value: `${p.runnerUp.displayName} — *${p.runnerUp.songTitle}* · ${formatGoldShort(p.prizeSecond)} gold`,
+      inline: false,
+    });
+  }
+  if (p.luckyVoter) {
+    fields.push({
+      name: "🍀 Lucky voter",
+      value: `${p.luckyVoter.displayName} · ${formatGoldShort(p.prizeLuckyVoter)} gold`,
+      inline: false,
+    });
+  }
+  fields.push({
+    name: "📊 Turnout",
+    value: `${p.totalSubmissions} submission${p.totalSubmissions === 1 ? "" : "s"} · ${p.totalVotes} vote${p.totalVotes === 1 ? "" : "s"}`,
+    inline: false,
+  });
+
+  const allowedUserIds = [p.winner?.discordId, p.runnerUp?.discordId, p.luckyVoter?.discordId].filter(
+    (id): id is string => !!id
+  );
+
+  await sendWebhook({
+    content: description,
+    embeds: [
+      {
+        title: `🏆 ${p.title} — Results`,
+        color: COLORS.green,
+        fields,
+        footer: { text: "Banter Boys Song Contest · prizes paid in-game" },
+        timestamp: new Date().toISOString(),
+      },
+    ],
+    allowed_mentions: { parse: [], users: allowedUserIds },
+  });
+}
+
+export async function notifySongSubmission(p: {
+  submitterDisplayName: string;
+  submitterDiscordId: string | null;
+  songTitle: string;
+  contestTitle: string;
+}): Promise<void> {
+  const who = p.submitterDiscordId
+    ? `<@${p.submitterDiscordId}>`
+    : `**${p.submitterDisplayName}**`;
+  const link = BASE_URL ? `\n\n[Listen & vote on Banter Boys](${BASE_URL}/song-contest)` : "";
+  await sendWebhook({
+    content: `🎵 ${who} submitted **“${p.songTitle}”** to **${p.contestTitle}**.${link}`,
+    // Render the mention without pinging the submitter for their own entry.
+    allowed_mentions: { parse: [], users: [] },
+  });
+}
+
+export async function notifySongVotingOpen(p: {
+  contestTitle: string;
+  submissionCount: number;
+}): Promise<void> {
+  const link = BASE_URL ? `\n\n[Go listen & vote](${BASE_URL}/song-contest)` : "";
+  await sendWebhook({
+    content: `🗳️ **Voting is now open** for **${p.contestTitle}**! ${p.submissionCount} songs are in — listen to them all and cast your vote.${link}`,
+  });
+}
+
+export async function notifySongVote(p: {
+  voterDisplayName: string;
+  voterDiscordId: string | null;
+  direction: "UP" | "DOWN";
+  songTitle: string;
+  submitterDisplayName: string;
+  contestTitle: string;
+}): Promise<void> {
+  const who = p.voterDiscordId ? `<@${p.voterDiscordId}>` : `**${p.voterDisplayName}**`;
+  const icon = p.direction === "UP" ? "👍" : "👎";
+  const verb = p.direction === "UP" ? "upvoted" : "downvoted";
+  await sendWebhook({
+    content: `${icon} ${who} ${verb} **“${p.songTitle}”** by ${p.submitterDisplayName} in **${p.contestTitle}**.`,
+    // Render the voter mention without pinging anyone.
+    allowed_mentions: { parse: [], users: [] },
+  });
+}
