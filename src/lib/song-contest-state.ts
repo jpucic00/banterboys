@@ -34,7 +34,6 @@ export type ContestStateView = {
   contest: {
     id: string;
     title: string;
-    description: string;
     status: "OPEN" | "CLOSED";
     prizeFirst: number;
     prizeSecond: number;
@@ -165,7 +164,6 @@ export async function getContestState(
     contest: {
       id: contest.id,
       title: contest.title,
-      description: contest.description,
       status: contest.status,
       prizeFirst: contest.prizeFirst,
       prizeSecond: contest.prizeSecond,

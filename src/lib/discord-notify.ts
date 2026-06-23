@@ -756,7 +756,6 @@ function formatGoldShort(amount: number): string {
 
 export async function notifySongContestCreated(p: {
   title: string;
-  description: string;
   prizeFirst: number;
   prizeSecond: number;
   prizeLuckyVoter: number;
@@ -767,7 +766,7 @@ export async function notifySongContestCreated(p: {
     embeds: [
       {
         title: `🎤 ${p.title}`,
-        description: p.description,
+        description: "Submit a song about the Banter Boys, then listen to every entry and cast your votes. Full rules are on the site.",
         color: COLORS.blue,
         fields: [
           { name: "🥇 1st place", value: `${formatGoldShort(p.prizeFirst)} gold`, inline: true },

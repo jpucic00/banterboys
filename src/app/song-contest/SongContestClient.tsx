@@ -14,6 +14,29 @@ const MAX_MB = 50;
 const COVER_MAX_MB = 5;
 const REQUIRED_LISTEN_SECONDS = 15;
 
+// Fixed contest rules shown on the page (prize amounts intentionally omitted —
+// they're rendered separately as prize chips). Edit this text to change the rules.
+const CONTEST_RULES = `Compose and submit an original song about the Banter Boys — our guild, our heroes, our legendary wipes and our finest hours. To qualify, your entry must be about Banter Boys: the players, the drama, the banter. Off-theme songs don't count. To give everyone enough time for creativity, the contest will end on Saturday evening.
+
+📜 ENTERING
+• One song per person — once you submit, it's final, so make it count.
+• Audio or video accepted (mp3, wav, m4a, mp4, and more), up to 50 MB. Add a cover image if you want to set the mood.
+• You can submit any of the songs created over the last weeks as your entry.
+
+🗳️ HOW VOTING WORKS
+• Voting unlocks once at least 5 songs are in — so get your entries up.
+• You have to actually listen before you judge: every other song needs at least 15 seconds of play, and you'll earn a "✓ Listened" badge on each one as you go. No drive-by voting.
+• Everyone gets 2 👍 and 2 👎 — four votes in total. One vote per song, and you can't vote on your own entry.
+• Nothing's locked in — change your votes as much as you like until the contest closes.
+• It's all in the open: hit "See votes" on any song to see who backed it.
+
+🏆 HOW WINNERS ARE DECIDED
+• A song's score is its 👍 minus its 👎. Highest score wins; second place takes runner-up.
+• A clean favourite beats a love-it-or-hate-it split — so spend your downvotes wisely.
+
+🍀 THE LUCKY VOTER — WHY YOU SHOULD VOTE ON EVERYTHING
+One lucky voter also walks away with a prize purely for taking part — and your odds scale with how much you vote. Every single vote you cast is another entry in the draw. Use all four (2 👍 + 2 👎) and you get up to FOUR TIMES the chance of being picked versus someone who voted just once. So listen to every song, judge them honestly, and spend all your votes.`;
+
 function fmtBytes(n: number): string {
   if (n >= 1024 * 1024) return `${(n / (1024 * 1024)).toFixed(1)} MB`;
   if (n >= 1024) return `${Math.round(n / 1024)} KB`;
@@ -106,24 +129,13 @@ export default function SongContestClient({
   const isOpen = contest?.status === "OPEN";
   const isClosed = contest?.status === "CLOSED";
 
-  if (!contest) {
-    return (
-      <div className="max-w-3xl mx-auto text-center py-20 space-y-3">
-        <h1 className="text-2xl font-bold text-text-primary">Song Contest</h1>
-        <p className="text-text-secondary">
-          No contest is running right now. Check back soon — the next one will be announced on Discord.
-        </p>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6 pb-32">
-      {/* Header */}
+      {/* Header — the rules are always shown, with or without an active contest */}
       <header className="rounded-xl border border-border-light/50 bg-surface p-6 space-y-4">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <h1 className="text-2xl sm:text-3xl font-bold text-text-primary flex items-center gap-2">
-            <span>🎤</span> {contest.title}
+            <span>🎤</span> {contest?.title ?? "Banter Boys Song Contest"}
           </h1>
           <span
             className={`text-xs font-bold uppercase tracking-wide px-3 py-1 rounded-full ${
@@ -132,27 +144,37 @@ export default function SongContestClient({
                 : "bg-text-muted/10 text-text-muted border border-border"
             }`}
           >
-            {isOpen ? "● Open" : "Closed"}
+            {isOpen ? "● Open" : isClosed ? "Closed" : "Not running"}
           </span>
         </div>
         <p className="text-sm text-text-secondary whitespace-pre-line leading-relaxed">
-          {contest.description}
+          {CONTEST_RULES}
         </p>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
-          <PrizeChip rank="🥇 1st place" amount={contest.prizeFirst} accent />
-          <PrizeChip rank="🥈 2nd place" amount={contest.prizeSecond} />
-          <PrizeChip rank="🍀 Lucky voter" amount={contest.prizeLuckyVoter} />
-        </div>
-        <p className="text-xs text-text-muted">
-          Prizes are paid out in-game by the house. The lucky voter is drawn at random from everyone who votes.
-        </p>
+        {contest && (
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              <PrizeChip rank="🥇 1st place" amount={contest.prizeFirst} accent />
+              <PrizeChip rank="🥈 2nd place" amount={contest.prizeSecond} />
+              <PrizeChip rank="🍀 Lucky voter" amount={contest.prizeLuckyVoter} />
+            </div>
+            <p className="text-xs text-text-muted">
+              Prizes are paid out in-game by the house. The lucky voter is drawn at random from everyone who votes.
+            </p>
+          </>
+        )}
       </header>
 
+      {!contest && (
+        <p className="text-sm text-text-muted text-center py-6 border border-border-light/50 rounded-xl bg-surface">
+          No contest is running right now — the next one will be announced on Discord.
+        </p>
+      )}
+
       {/* Results banner (closed) */}
-      {isClosed && results && <ResultsBanner results={results} contest={contest} />}
+      {contest && isClosed && results && <ResultsBanner results={results} contest={contest} />}
 
       {/* Submission panel (open only) */}
-      {isOpen && (
+      {contest && isOpen && (
         <SubmitPanel
           isLoggedIn={isLoggedIn}
           mySubmission={
@@ -166,18 +188,20 @@ export default function SongContestClient({
       )}
 
       {/* Submissions + player */}
-      <SubmissionsSection
-        submissions={submissions}
-        viewer={viewer}
-        results={results}
-        isOpen={!!isOpen}
-        isLoggedIn={isLoggedIn}
-        totalVotes={state.totalVotes}
-        minSubmissionsToVote={state.minSubmissionsToVote}
-        votesPerDirection={state.votesPerDirection}
-        onChanged={refresh}
-        onError={setToast}
-      />
+      {contest && (
+        <SubmissionsSection
+          submissions={submissions}
+          viewer={viewer}
+          results={results}
+          isOpen={!!isOpen}
+          isLoggedIn={isLoggedIn}
+          totalVotes={state.totalVotes}
+          minSubmissionsToVote={state.minSubmissionsToVote}
+          votesPerDirection={state.votesPerDirection}
+          onChanged={refresh}
+          onError={setToast}
+        />
+      )}
 
       {toast && (
         <div className="fixed bottom-28 left-1/2 -translate-x-1/2 z-50 bg-bg-tertiary border border-border-light text-text-primary text-sm px-4 py-2 rounded-lg shadow-xl">

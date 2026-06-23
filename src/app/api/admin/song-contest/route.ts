@@ -5,7 +5,6 @@ import { isAdminEmail } from "@/lib/admin";
 import {
   getOpenContest,
   DEFAULT_TITLE,
-  DEFAULT_DESCRIPTION,
   DEFAULT_PRIZE_FIRST,
   DEFAULT_PRIZE_SECOND,
   DEFAULT_PRIZE_LUCKY,
@@ -30,12 +29,8 @@ export async function POST(req: NextRequest) {
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const title = (body.title?.toString() ?? "").trim() || DEFAULT_TITLE;
-  const description = (body.description?.toString() ?? "").trim() || DEFAULT_DESCRIPTION;
   if (title.length > 120) {
     return NextResponse.json({ error: "Title too long (max 120 chars)." }, { status: 400 });
-  }
-  if (description.length > 4000) {
-    return NextResponse.json({ error: "Description too long (max 4000 chars)." }, { status: 400 });
   }
   const prizeFirst = nonNegOr(body.prizeFirst, DEFAULT_PRIZE_FIRST);
   const prizeSecond = nonNegOr(body.prizeSecond, DEFAULT_PRIZE_SECOND);
@@ -50,14 +45,14 @@ export async function POST(req: NextRequest) {
   }
 
   const contest = await prisma.songContest.create({
-    data: { title, description, prizeFirst, prizeSecond, prizeLuckyVoter },
-    select: { id: true, title: true, description: true, prizeFirst: true, prizeSecond: true, prizeLuckyVoter: true },
+    // Description is a fixed rules text on the page (CONTEST_RULES), not stored per-contest.
+    data: { title, description: "", prizeFirst, prizeSecond, prizeLuckyVoter },
+    select: { id: true, title: true, prizeFirst: true, prizeSecond: true, prizeLuckyVoter: true },
   });
 
   // Fire-and-forget announcement; never blocks the response.
   notifySongContestCreated({
     title: contest.title,
-    description: contest.description,
     prizeFirst: contest.prizeFirst,
     prizeSecond: contest.prizeSecond,
     prizeLuckyVoter: contest.prizeLuckyVoter,

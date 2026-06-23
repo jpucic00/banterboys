@@ -5,10 +5,6 @@ import { CoinAmount } from "@/components/CoinIcon";
 import type { ContestStateView } from "@/lib/song-contest-state";
 
 const DEFAULT_TITLE = "Banter Boys Song Contest";
-const DEFAULT_DESCRIPTION =
-  "Write and submit an original song about the Banter Boys — our guild, our players, our glory and our disasters. " +
-  "Entries must be relevant to Banter Boys to qualify. One submission per person. " +
-  "Anyone can vote, and you can change your vote until the contest closes. Most votes wins.";
 
 export default function SongContestManager() {
   const [state, setState] = useState<ContestStateView | null>(null);
@@ -18,8 +14,7 @@ export default function SongContestManager() {
 
   // Create form
   const [title, setTitle] = useState(DEFAULT_TITLE);
-  const [description, setDescription] = useState(DEFAULT_DESCRIPTION);
-  const [first, setFirst] = useState("20");
+  const [first, setFirst] = useState("30");
   const [second, setSecond] = useState("10");
   const [lucky, setLucky] = useState("10");
   const [formError, setFormError] = useState<string | null>(null);
@@ -57,7 +52,6 @@ export default function SongContestManager() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: title.trim(),
-          description: description.trim(),
           prizeFirst: kk(first),
           prizeSecond: kk(second),
           prizeLuckyVoter: kk(lucky),
@@ -225,15 +219,9 @@ export default function SongContestManager() {
                   className="w-full bg-surface border border-border rounded px-2 py-1.5 text-sm text-text-primary focus:outline-none focus:border-gold"
                 />
               </Field>
-              <Field label="Description (rules — shown to everyone)">
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={4}
-                  maxLength={4000}
-                  className="w-full bg-surface border border-border rounded px-2 py-1.5 text-sm text-text-primary focus:outline-none focus:border-gold resize-y"
-                />
-              </Field>
+              <p className="text-xs text-text-muted">
+                The contest rules are a fixed text shown on the page — edit them in code (CONTEST_RULES in SongContestClient).
+              </p>
               <div className="grid grid-cols-3 gap-3">
                 <Field label="🥇 1st (kk gold)">
                   <input type="number" step="0.5" min="0" value={first} onChange={(e) => setFirst(e.target.value)}

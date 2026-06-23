@@ -17,7 +17,7 @@ type Tx =
 // Default prize pool (gold). DISPLAY-ONLY — paid by hand in-game, never credited
 // to any balance. Overridable per contest at creation time; env vars set the
 // defaults the admin form is pre-filled with.
-export const DEFAULT_PRIZE_FIRST = envNonNegativeInt("SONG_CONTEST_PRIZE_FIRST", 20_000_000);
+export const DEFAULT_PRIZE_FIRST = envNonNegativeInt("SONG_CONTEST_PRIZE_FIRST", 30_000_000);
 export const DEFAULT_PRIZE_SECOND = envNonNegativeInt("SONG_CONTEST_PRIZE_SECOND", 10_000_000);
 export const DEFAULT_PRIZE_LUCKY = envNonNegativeInt("SONG_CONTEST_PRIZE_LUCKY", 10_000_000);
 
@@ -34,10 +34,6 @@ export const MIN_SUBMISSIONS_TO_VOTE = envNonNegativeInt("SONG_CONTEST_MIN_SUBMI
 export const VOTES_PER_DIRECTION = envNonNegativeInt("SONG_CONTEST_VOTES_PER_DIRECTION", 2);
 
 export const DEFAULT_TITLE = "Banter Boys Song Contest";
-export const DEFAULT_DESCRIPTION =
-  "Write and submit an original song about the Banter Boys — our guild, our players, our glory and our disasters. " +
-  "Entries must be relevant to Banter Boys to qualify. One submission per person. " +
-  "Anyone can vote, and you can change your vote until the contest closes. Most votes wins.";
 
 // Allowed upload types, keyed by extension → canonical MIME we store and serve.
 // Browser-reported MIME is unreliable (often empty/octet-stream), so the file
