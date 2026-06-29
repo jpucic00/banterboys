@@ -16,6 +16,7 @@ export type UserPvpRow = {
 
 export type UserTicketStats = {
   netProfit: number;
+  netWinnings: number;
   grossWinnings: number;
   grossLosses: number;
   pendingStakes: number;
@@ -55,6 +56,7 @@ export function calcUserTicketStats(tickets: UserTicketRow[]): UserTicketStats {
 
   return {
     netProfit,
+    netWinnings: netWinProfit,
     grossWinnings,
     grossLosses,
     pendingStakes,

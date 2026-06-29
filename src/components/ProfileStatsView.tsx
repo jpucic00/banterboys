@@ -114,10 +114,10 @@ export default function ProfileStatsView({
           />
           <CurrencyStat
             label="Winnings"
-            gold={ticketsGold.grossWinnings}
-            tc={ticketsTc.grossWinnings}
+            gold={ticketsGold.netWinnings}
+            tc={ticketsTc.netWinnings}
             color="text-win"
-            sub="gross payouts on won slips"
+            sub="profit on won slips, excl. stake"
           />
           <CurrencyStat
             label="Losses"

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { redirect } from "next/navigation";
@@ -207,6 +208,49 @@ function calcPvPStats(bets: PvPRow[]): PvPStats {
   };
 }
 
+function CurrencyCell({
+  gold,
+  tc,
+  sign,
+  colorByValue,
+}: {
+  gold: number;
+  tc: number;
+  sign?: boolean;
+  colorByValue?: boolean;
+}) {
+  const row = (v: number, src: string, alt: string) => {
+    const color = colorByValue
+      ? v >= 0
+        ? "text-win"
+        : "text-loss"
+      : "text-text-secondary";
+    const prefix = sign && v > 0 ? "+" : "";
+    return (
+      <div className="flex items-center justify-end gap-1.5">
+        <Image
+          src={src}
+          alt={alt}
+          width={12}
+          height={12}
+          className="inline-block shrink-0"
+          style={{ imageRendering: "pixelated" }}
+        />
+        <span className={`font-mono ${color}`}>
+          {prefix}
+          {fmt(v)}
+        </span>
+      </div>
+    );
+  };
+  return (
+    <div className="space-y-0.5">
+      {row(gold, "/tibia/crystal_coin.webp", "gp")}
+      {row(tc, "/tibia/tibia_coin.webp", "TC")}
+    </div>
+  );
+}
+
 export default async function AdminPage({ searchParams }: { searchParams: Promise<{ tab?: string }> }) {
   const session = await auth();
 
@@ -220,8 +264,11 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
   const isSong = tab === "song";
 
   const now = new Date();
-  const day7Ago = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
   const day30Ago = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+  // Start of the current week: most recent Sunday at 00:00 (week runs Sun→Sun).
+  const weekStart = new Date(now);
+  weekStart.setHours(0, 0, 0, 0);
+  weekStart.setDate(weekStart.getDate() - weekStart.getDay());
 
   const [tickets, pvpBets, slotSpins, gambleRounds, henricusSpins, henricusFrames, totalUsers, activeEvents] = await Promise.all([
     prisma.ticket.findMany({
@@ -248,9 +295,24 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
 
   const allTime = calcTicketStats(tickets);
   const last30d = calcTicketStats(tickets.filter((t) => t.createdAt >= day30Ago));
-  const last7d = calcTicketStats(tickets.filter((t) => t.createdAt >= day7Ago));
+  const thisWeek = calcTicketStats(tickets.filter((t) => t.createdAt >= weekStart));
   const goldTickets = calcTicketStats(tickets.filter((t) => t.currency === "GOLD"));
   const tcTickets = calcTicketStats(tickets.filter((t) => t.currency === "TIBIA_COINS"));
+
+  // Per-currency, per-period stats for the Period Comparison table. Profit and
+  // volume cannot be pooled across GOLD and TIBIA_COINS (different currencies),
+  // so each period is split by currency. Win-rate/ticket counts are
+  // currency-agnostic and use the pooled allTime/last30d/thisWeek above.
+  const goldLast30d = calcTicketStats(tickets.filter((t) => t.currency === "GOLD" && t.createdAt >= day30Ago));
+  const tcLast30d = calcTicketStats(tickets.filter((t) => t.currency === "TIBIA_COINS" && t.createdAt >= day30Ago));
+  const goldThisWeek = calcTicketStats(tickets.filter((t) => t.currency === "GOLD" && t.createdAt >= weekStart));
+  const tcThisWeek = calcTicketStats(tickets.filter((t) => t.currency === "TIBIA_COINS" && t.createdAt >= weekStart));
+
+  const periods = [
+    { label: "All-time", all: allTime, gold: goldTickets, tc: tcTickets },
+    { label: "Last 30d", all: last30d, gold: goldLast30d, tc: tcLast30d },
+    { label: "This week", all: thisWeek, gold: goldThisWeek, tc: tcThisWeek },
+  ];
 
   const pvpGold = calcPvPStats(pvpBets.filter((b) => b.currency === "GOLD"));
   const pvpTc = calcPvPStats(pvpBets.filter((b) => b.currency === "TIBIA_COINS"));
@@ -260,14 +322,14 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
     slotSpins.filter((s) => s.createdAt >= day30Ago),
     gambleRounds.filter((g) => g.createdAt >= day30Ago)
   );
-  const slots7d = calcSlotStats(
-    slotSpins.filter((s) => s.createdAt >= day7Ago),
-    gambleRounds.filter((g) => g.createdAt >= day7Ago)
+  const slotsThisWeek = calcSlotStats(
+    slotSpins.filter((s) => s.createdAt >= weekStart),
+    gambleRounds.filter((g) => g.createdAt >= weekStart)
   );
 
   const henricusAll = calcHenricusStats(henricusSpins);
   const henricus30d = calcHenricusStats(henricusSpins.filter((s) => s.createdAt >= day30Ago));
-  const henricus7d = calcHenricusStats(henricusSpins.filter((s) => s.createdAt >= day7Ago));
+  const henricusThisWeek = calcHenricusStats(henricusSpins.filter((s) => s.createdAt >= weekStart));
 
   const settledHenricusFrames = henricusFrames.filter((f) => f.status === "SETTLED");
   const settledHenricusFrameCount = settledHenricusFrames.length;
@@ -413,25 +475,19 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {(
-                [
-                  { label: "All-time", s: allTime },
-                  { label: "Last 30d", s: last30d },
-                  { label: "Last 7d", s: last7d },
-                ] as const
-              ).map(({ label, s }) => (
+              {periods.map(({ label, all, gold, tc }) => (
                 <tr key={label}>
-                  <td className="text-text-secondary py-3 pr-4 font-medium">{label}</td>
-                  <td className={`text-right px-4 font-mono font-semibold ${s.houseProfit >= 0 ? "text-win" : "text-loss"}`}>
-                    {s.houseProfit >= 0 ? "+" : ""}{fmt(s.houseProfit)} gp
+                  <td className="text-text-secondary py-3 pr-4 font-medium align-top">{label}</td>
+                  <td className="text-right px-4 font-semibold align-top">
+                    <CurrencyCell gold={gold.houseProfit} tc={tc.houseProfit} sign colorByValue />
                   </td>
-                  <td className="text-right px-4 text-text-primary">
-                    {s.houseWinRate != null ? s.houseWinRate.toFixed(1) + "%" : "—"}
+                  <td className="text-right px-4 text-text-primary align-top">
+                    {all.houseWinRate != null ? all.houseWinRate.toFixed(1) + "%" : "—"}
                   </td>
-                  <td className="text-right px-4 text-text-secondary font-mono">
-                    {fmt(s.totalVolume)} gp
+                  <td className="text-right px-4 align-top">
+                    <CurrencyCell gold={gold.totalVolume} tc={tc.totalVolume} />
                   </td>
-                  <td className="text-right px-4 text-text-muted">{s.counts.total}</td>
+                  <td className="text-right px-4 text-text-muted align-top">{all.counts.total}</td>
                 </tr>
               ))}
             </tbody>
@@ -540,7 +596,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     [
                       { label: "All-time", s: slotsAll },
                       { label: "Last 30d", s: slots30d },
-                      { label: "Last 7d", s: slots7d },
+                      { label: "This week", s: slotsThisWeek },
                     ] as const
                   ).map(({ label, s }) => (
                     <tr key={label}>
@@ -659,7 +715,7 @@ export default async function AdminPage({ searchParams }: { searchParams: Promis
                     [
                       { label: "All-time", s: henricusAll },
                       { label: "Last 30d", s: henricus30d },
-                      { label: "Last 7d", s: henricus7d },
+                      { label: "This week", s: henricusThisWeek },
                     ] as const
                   ).map(({ label, s }) => (
                     <tr key={label}>
