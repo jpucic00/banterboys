@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { createPortal } from "react-dom";
 import Image from "next/image";
 import { formatGold } from "./CoinIcon";
+import { GAMBLING_DISABLED } from "@/lib/betting-flags";
 
 interface JoinBetButtonProps {
   betId: string;
@@ -39,6 +40,9 @@ export default function JoinBetButton({
 
   // Hide button only for the creator of the bet
   if (session?.user?.id === creatorId) return null;
+
+  // Wagering closed — no joining open bets
+  if (GAMBLING_DISABLED) return null;
 
   // Not signed in — show button that redirects to sign in
   if (!session?.user) {

@@ -12,6 +12,7 @@ import {
   MAX_TICKET_PROFIT,
   MAX_TICKET_STAKE,
 } from "@/lib/bet-limits";
+import { GAMBLING_DISABLED, BETTING_DISABLED_MESSAGE } from "@/lib/betting-flags";
 
 interface Event {
   id: string;
@@ -488,6 +489,10 @@ export default function TicketsPage() {
 
   async function handleSubmit() {
     if (slip.length === 0 || !amount) return;
+    if (GAMBLING_DISABLED) {
+      setSubmitError(BETTING_DISABLED_MESSAGE);
+      return;
+    }
     setSubmitError(null);
 
     // Filter out expired events (events no longer in the UPCOMING list)
@@ -889,7 +894,14 @@ export default function TicketsPage() {
                     </p>
                   )}
 
-                  {canInteract ? (
+                  {GAMBLING_DISABLED ? (
+                    <button
+                      disabled
+                      className="w-full bg-gold text-black py-2 rounded text-sm font-bold uppercase tracking-wide opacity-50 cursor-not-allowed"
+                    >
+                      Betting Disabled
+                    </button>
+                  ) : canInteract ? (
                     <button
                       onClick={handleSubmit}
                       disabled={submitting || !amount || profitCapExceeded}
@@ -1067,7 +1079,14 @@ export default function TicketsPage() {
                     </p>
                   )}
 
-                  {canInteract ? (
+                  {GAMBLING_DISABLED ? (
+                    <button
+                      disabled
+                      className="w-full bg-gold text-black py-2 rounded text-sm font-bold uppercase tracking-wide opacity-50 cursor-not-allowed"
+                    >
+                      Betting Disabled
+                    </button>
+                  ) : canInteract ? (
                     <button
                       onClick={handleSubmit}
                       disabled={submitting || !amount || profitCapExceeded}

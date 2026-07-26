@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
+import { GAMBLING_DISABLED, BETTING_DISABLED_MESSAGE } from "./betting-flags";
 
-export const BETTING_DISABLED_MESSAGE =
-  "Betting is currently unavailable. Please try again later.";
+export { BETTING_DISABLED_MESSAGE };
 
 export function isBettingDisabled(): boolean {
-  return process.env.BETTING_DISABLED === "true";
+  return GAMBLING_DISABLED || process.env.BETTING_DISABLED === "true";
 }
 
 export function bettingDisabledResponse() {

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { GAMBLING_DISABLED, BETTING_DISABLED_MESSAGE } from "@/lib/betting-flags";
 
 type SpinnerInfo = {
   id: string;
@@ -161,6 +162,10 @@ export default function HenricusWheelClient({
 
   const handleSpin = useCallback(async () => {
     if (spinning) return;
+    if (GAMBLING_DISABLED) {
+      setError(BETTING_DISABLED_MESSAGE);
+      return;
+    }
     if (!state.user.isLoggedIn) {
       setError("Sign in with Discord to spin.");
       return;
@@ -225,7 +230,11 @@ export default function HenricusWheelClient({
   const { spinsRemaining, myChampions } = state.user;
   const spinDebtBlocked = state.user.balance - SPIN_STAKE < -500;
   const canSpin =
-    state.user.isLoggedIn && spinsRemaining > 0 && !spinDebtBlocked && !spinning;
+    !GAMBLING_DISABLED &&
+    state.user.isLoggedIn &&
+    spinsRemaining > 0 &&
+    !spinDebtBlocked &&
+    !spinning;
 
   const revealedUser = reveal
     ? state.eligibleUsers.find((u) => u.alias === reveal.assignedAlias)
@@ -457,7 +466,9 @@ export default function HenricusWheelClient({
                 : "bg-[#2a2a2a] text-text-muted cursor-not-allowed"
             }`}
           >
-            {spinning
+            {GAMBLING_DISABLED
+              ? "GAMBLING DISABLED"
+              : spinning
               ? "SPINNING…"
               : !state.user.isLoggedIn
               ? "SIGN IN TO SPIN"
@@ -643,7 +654,7 @@ export default function HenricusWheelClient({
               </div>
             </div>
             <div className="mt-6 flex gap-3 justify-center">
-              {reveal.spinsRemaining > 0 && (
+              {!GAMBLING_DISABLED && reveal.spinsRemaining > 0 && (
                 <button
                   onClick={() => {
                     setReveal(null);

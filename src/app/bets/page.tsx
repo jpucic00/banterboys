@@ -5,6 +5,7 @@ import { useEffect, useState, useCallback, useMemo } from "react";
 import { createPortal } from "react-dom";
 import BetCard from "@/components/BetCard";
 import { CoinAmount } from "@/components/CoinIcon";
+import { GAMBLING_DISABLED } from "@/lib/betting-flags";
 import Image from "next/image";
 
 interface Sport {
@@ -157,7 +158,7 @@ export default function BetsPage() {
             </button>
           ))}
         </div>
-        {session && (
+        {session && !GAMBLING_DISABLED && (
           <button
             onClick={() => setShowCreate(true)}
             className="text-xs font-medium px-3 py-1.5 rounded transition-colors"
@@ -313,6 +314,7 @@ function CreateBetModal({
 
   async function handleSubmit() {
     if (!selectedEventId || !selectedPick || !amount || !joinerPick || !joinerAmount) return;
+    if (GAMBLING_DISABLED) return;
     setSubmitting(true);
     try {
       const res = await fetch("/api/bets", {
