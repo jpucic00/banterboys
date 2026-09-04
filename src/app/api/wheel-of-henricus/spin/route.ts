@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
-import { isBettingDisabled, bettingDisabledResponse } from "@/lib/betting-status";
+import { isWheelDisabled, wheelDisabledResponse } from "@/lib/betting-status";
 import { MAX_DEBT } from "@/lib/bet-limits";
 import {
   SPIN_STAKE,
@@ -23,7 +23,7 @@ class SpinError extends Error {
 }
 
 export async function POST() {
-  if (isBettingDisabled()) return bettingDisabledResponse();
+  if (isWheelDisabled()) return wheelDisabledResponse();
 
   const session = await auth();
   if (!session?.user) {

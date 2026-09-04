@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GAMBLING_DISABLED, BETTING_DISABLED_MESSAGE } from "@/lib/betting-flags";
+import { WHEEL_DISABLED, WHEEL_DISABLED_MESSAGE } from "@/lib/betting-flags";
 
 type SpinnerInfo = {
   id: string;
@@ -162,8 +162,8 @@ export default function HenricusWheelClient({
 
   const handleSpin = useCallback(async () => {
     if (spinning) return;
-    if (GAMBLING_DISABLED) {
-      setError(BETTING_DISABLED_MESSAGE);
+    if (WHEEL_DISABLED) {
+      setError(WHEEL_DISABLED_MESSAGE);
       return;
     }
     if (!state.user.isLoggedIn) {
@@ -230,7 +230,7 @@ export default function HenricusWheelClient({
   const { spinsRemaining, myChampions } = state.user;
   const spinDebtBlocked = state.user.balance - SPIN_STAKE < -500;
   const canSpin =
-    !GAMBLING_DISABLED &&
+    !WHEEL_DISABLED &&
     state.user.isLoggedIn &&
     spinsRemaining > 0 &&
     !spinDebtBlocked &&
@@ -466,8 +466,8 @@ export default function HenricusWheelClient({
                 : "bg-[#2a2a2a] text-text-muted cursor-not-allowed"
             }`}
           >
-            {GAMBLING_DISABLED
-              ? "GAMBLING DISABLED"
+            {WHEEL_DISABLED
+              ? "WHEEL CLOSED"
               : spinning
               ? "SPINNING…"
               : !state.user.isLoggedIn
@@ -654,7 +654,7 @@ export default function HenricusWheelClient({
               </div>
             </div>
             <div className="mt-6 flex gap-3 justify-center">
-              {!GAMBLING_DISABLED && reveal.spinsRemaining > 0 && (
+              {!WHEEL_DISABLED && reveal.spinsRemaining > 0 && (
                 <button
                   onClick={() => {
                     setReveal(null);

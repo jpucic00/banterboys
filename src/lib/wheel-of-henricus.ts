@@ -7,8 +7,8 @@ function envNonNegativeInt(key: string, fallback: number): number {
   return Number.isFinite(n) && n >= 0 ? Math.floor(n) : fallback;
 }
 
-export const SPIN_STAKE = envNonNegativeInt("HENRICUS_SPIN_STAKE", 25);
-export const SPIN_PAYOUT = envNonNegativeInt("HENRICUS_SPIN_PAYOUT", 500);
+export const SPIN_STAKE = envNonNegativeInt("HENRICUS_SPIN_STAKE", 0);
+export const SPIN_PAYOUT = envNonNegativeInt("HENRICUS_SPIN_PAYOUT", 250);
 export const MAX_SPINS_PER_FRAME = 3;
 
 type Tx = Omit<PrismaClient, "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"> | Prisma.TransactionClient;
